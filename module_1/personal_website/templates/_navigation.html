@@ -1,0 +1,6 @@
+<nav class="nav">
+  <a class="nav-link {% if request.endpoint == 'pages.about' %}active{% endif %}" href="{{ url_for('pages.about') }}">About</a>
+  <a class="nav-link {% if request.endpoint == 'pages.contact' %}active{% endif %}" href="{{ url_for('pages.contact') }}">Contact</a>
+  <a class="nav-link {% if request.endpoint == 'pages.projects' %}active{% endif %}" href="{{ url_for('pages.projects') }}">Projects</a>
+</nav>
+

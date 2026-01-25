@@ -5,5 +5,30 @@
 {% endblock header %}
 
 {% block content %}
-  <p>This is a message board for friendly messages.</p>
+
+<div class="about-container">
+  <div class="about-text">
+    <h1>Andres Sanchez-Castellanos</h1>
+    <h3>Student at Johns Hopkins University</h3>
+
+    <p>
+      My name is Andres Sanchez-Castellanos. I am a student at Johns Hopkins University
+      studying software engineering and artificial intelligence.
+    </p>
+
+    <p>
+      I am interested in data science, machine learning, and full-stack web development.
+      This website is a place to showcase my projects, skills, and experience.
+    </p>
+
+    <p>
+      You can use this site to learn more about my work, view my projects, and find my
+      contact information.
+    </p>
+  </div>
+
+  <div class="about-image">
+    <img src="{{ url_for('static', filename='me.jpg') }}" alt="Andres Sanchez-Castellanos">
+  </div>
+</div>
 {% endblock content %}

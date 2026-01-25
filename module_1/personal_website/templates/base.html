@@ -2,16 +2,27 @@
 <html lang="en">
 <head>
   <title>Andres Sanchez-Castellanos - {% block title %}{% endblock title %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
+
 <body>
-  <h1>Andres Sanchez-Castellanos</h1>
-  <section>
-    <header>
-      {% block header %}{% endblock header %}
-    </header>
-    <main>
-      {% block content %}<p>No messages.</p>{% endblock content %}
-    </main>
-  </section>
+ <div class="topbar">
+  <div class="topbar-inner">
+    <h1 class="site-title">Andres Sanchez-Castellanos</h1>
+    {% include "_navigation.html" %}
+  </div>
+</div>
+
+<section class="page">
+  <header>
+    {% block header %}{% endblock header %}
+  </header>
+
+  <main>
+    {% block content %}{% endblock content %}
+  </main>
+</section>
+
 </body>
 </html>
+
