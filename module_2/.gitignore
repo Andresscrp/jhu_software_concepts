@@ -1,15 +1,32 @@
+# =====================
 # Python cache
+# =====================
 __pycache__/
 *.pyc
+*.pyo
 
+# =====================
 # Virtual environments
+# =====================
 .venv/
 venv/
+ENV/
 
-# LLM / model artifacts
-models/
+# =====================
+# LLM / model artifacts (DO NOT COMMIT)
+# =====================
+llm_hosting/models/
+llm_hosting/models/**
 *.gguf
 
+# =====================
 # OS junk
+# =====================
 .DS_Store
 Thumbs.db
+
+# =====================
+# Editor junk
+# =====================
+.vscode/
+.idea/
