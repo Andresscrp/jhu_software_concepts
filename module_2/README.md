@@ -84,7 +84,7 @@ Format:
 ]}
 '@ | Out-File -Encoding utf8 sample_input.json
 
-
+###SOURCES: https://realpython.com/python-web-scraping-practical-introduction/, https://realpython.com/beautiful-soup-web-scraper-python/, ChatGPT
 
 
 
