@@ -1,7 +1,7 @@
-**Name:** Andres Sanchez-Castellanos  
+**Name:** Andres Sanchez-Castellanos
+**JHED ID** asanch69  
 **Course:** 605.256 Modern Software Concepts in Python  
-**Module:** Module 2 – Assignment: Web Scraping  
-**Due:** Sunday 11:59pm
+**Module:** Module 2 – Assignment: Web Scraping 
 
 ---
 ### SOURCES: https://realpython.com/python-web-scraping-practical-introduction/, https://realpython.com/beautiful-soup-web-scraper-python/, ChatGPT
