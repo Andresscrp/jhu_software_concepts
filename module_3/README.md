@@ -32,6 +32,8 @@ The application allows users to refresh analysis results and re-run the data pip
 - `module_3\llm_extend_applicant_data.json` - LLM extended data for queries
 - `module_3/scrape.py` – pulls raw applicant data from GradCafe
 - `module_3/clean.py` – loads raw data, cleans/structures it, saves JSON outputs
+- `module_3\Module 3 Limitations.pdf` - written assignment about the limitations of using GradCafe data
+- `module_3\Module 3 Assignment Analysis.pdf` - written data report and evidence that my code works
 
 ---
 
