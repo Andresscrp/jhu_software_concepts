@@ -11,6 +11,9 @@
 - Course lecture materials
 - PostgreSQL documentation
 - Flask documentation
+- https://realpython.com/python-sql-libraries/
+- https://medium.com/dataexplorations/sqlalchemy-orm-a-more-pythonic-way-of-interacting-with-your-database-935b57fd2d4d
+- ChatGPT
 
 ---
 
