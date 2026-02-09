@@ -55,6 +55,7 @@ The application allows users to refresh analysis results and re-run the data pip
 
 ### Step 3 — SQL Analysis
 - Implemented assignment queries in `query_data.py`
+- Requires username: 'postgres', and password: 'Aasc060602'
 - Used parameterized SQL for safety and flexibility
 - Generated statistics for GPA, GRE, acceptance rates, and institutions
 
