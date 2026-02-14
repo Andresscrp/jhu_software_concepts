@@ -1,10 +1,13 @@
 import pytest
 
 import src.app as appmod
+import os
 
-
-# If the user/CI didn't set DATABASE_URL, give tests a default.
-# (CI Postgres service usually uses postgres/postgres on db "postgres")
+# Ensures db-marked tests always have a DB URL
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql://postgres:Aasc060602@localhost:5432/module_3db",
+)
 
 @pytest.fixture()
 def app():

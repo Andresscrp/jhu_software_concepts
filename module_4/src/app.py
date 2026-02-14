@@ -31,12 +31,6 @@ ROOT_DIR = APP_DIR.parent
 LOCK_FILE = APP_DIR / "pull.lock"
 DEFAULT_LOCK_FILE = LOCK_FILE
 
-DB_NAME = "module_3db"
-DB_USER = "postgres"
-DB_PASSWORD = "Aasc060602"
-DB_HOST = "localhost"
-DB_PORT = 5432
-
 FALL_2026 = "Fall 2026"
 MIN_SAMPLE_Q10 = 25
 

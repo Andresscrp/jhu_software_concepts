@@ -1,0 +1,277 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>clean &mdash; Andres&#39; GradCafe Analytics 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Andres' GradCafe Analytics
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Andres' GradCafe Analytics</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Module code</a></li>
+      <li class="breadcrumb-item active">clean</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for clean</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">clean.py</span>
+
+<span class="sd">Load applicant_data.json, normalize fields (numbers, blanks, dates), and write cleaned_applicant_data.json.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+
+<span class="c1">## ============================================================</span>
+<span class="c1">## Configuration: input and output file locations</span>
+<span class="c1">## ============================================================</span>
+
+<span class="n">INPUT_JSON</span> <span class="o">=</span> <span class="s2">&quot;applicant_data.json&quot;</span>
+<span class="n">OUTPUT_JSON</span> <span class="o">=</span> <span class="s2">&quot;cleaned_applicant_data.json&quot;</span>
+
+
+<span class="c1">## ============================================================</span>
+<span class="c1">## Helpers: normalize blank strings and parse numeric fields</span>
+<span class="c1">## ============================================================</span>
+
+<div class="viewcode-block" id="blank_to_none">
+<a class="viewcode-back" href="../api.html#clean.blank_to_none">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">blank_to_none</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert empty strings (or whitespace-only strings) to None; leave everything else unchanged.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">value</span></div>
+
+
+
+<div class="viewcode-block" id="to_int">
+<a class="viewcode-back" href="../api.html#clean.to_int">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">to_int</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert a value to int when possible; return None if it is missing or invalid.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">blank_to_none</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="to_float">
+<a class="viewcode-back" href="../api.html#clean.to_float">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">to_float</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert a value to float when possible; return None if it is missing or invalid.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">blank_to_none</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<span class="c1">## ============================================================</span>
+<span class="c1">## Helpers: clean decision and notification text into consistent formats</span>
+<span class="c1">## ============================================================</span>
+
+<div class="viewcode-block" id="normalize_decision">
+<a class="viewcode-back" href="../api.html#clean.normalize_decision">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_decision</span><span class="p">(</span><span class="n">decision</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Normalize decision strings into a consistent capitalization (e.g., Accepted, Rejected, Interview).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">decision</span> <span class="o">=</span> <span class="n">blank_to_none</span><span class="p">(</span><span class="n">decision</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">decision</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">decision</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+    <span class="n">mapping</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;accepted&quot;</span><span class="p">:</span> <span class="s2">&quot;Accepted&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;rejected&quot;</span><span class="p">:</span> <span class="s2">&quot;Rejected&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;waitlisted&quot;</span><span class="p">:</span> <span class="s2">&quot;Waitlisted&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;interview&quot;</span><span class="p">:</span> <span class="s2">&quot;Interview&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">mapping</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">decision</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span></div>
+
+
+
+<div class="viewcode-block" id="parse_notification">
+<a class="viewcode-back" href="../api.html#clean.parse_notification">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_notification</span><span class="p">(</span><span class="n">notification</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extract notification_date and notification_method from a notification string when possible.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">notification</span> <span class="o">=</span> <span class="n">blank_to_none</span><span class="p">(</span><span class="n">notification</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">notification</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;notification_date&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;notification_method&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+
+    <span class="n">text</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">notification</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="c1"># Matches things like: &quot;on 30/01/2026 via E-mail&quot; or &quot;on 12/01/2026 via Website&quot;</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;on\s+(\d{1,2}/\d{1,2}/\d</span><span class="si">{4}</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">)</span>
+    <span class="n">date</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">if</span> <span class="n">m</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="n">method</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="s2">&quot;email&quot;</span> <span class="ow">in</span> <span class="n">text</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;e-mail&quot;</span> <span class="ow">in</span> <span class="n">text</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;E-mail&quot;</span>
+    <span class="k">elif</span> <span class="s2">&quot;website&quot;</span> <span class="ow">in</span> <span class="n">text</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;Website&quot;</span>
+
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;notification_date&quot;</span><span class="p">:</span> <span class="n">date</span><span class="p">,</span> <span class="s2">&quot;notification_method&quot;</span><span class="p">:</span> <span class="n">method</span><span class="p">}</span></div>
+
+
+
+<span class="c1">## ============================================================</span>
+<span class="c1">## Record cleaning: transform one scraped record into a cleaned record</span>
+<span class="c1">## ============================================================</span>
+
+<div class="viewcode-block" id="clean_record">
+<a class="viewcode-back" href="../api.html#clean.clean_record">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">clean_record</span><span class="p">(</span><span class="n">record</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert one scraped record into a cleaned record with normalized types and parsed notification fields.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">notif</span> <span class="o">=</span> <span class="n">parse_notification</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;notification&quot;</span><span class="p">))</span>
+
+    <span class="n">cleaned</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;institution&quot;</span><span class="p">:</span> <span class="n">blank_to_none</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;institution&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;program&quot;</span><span class="p">:</span> <span class="n">blank_to_none</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;program&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;degree&quot;</span><span class="p">:</span> <span class="n">blank_to_none</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;degree&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;country_of_origin&quot;</span><span class="p">:</span> <span class="n">blank_to_none</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;country_of_origin&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;decision&quot;</span><span class="p">:</span> <span class="n">normalize_decision</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;decision&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;notification_date&quot;</span><span class="p">:</span> <span class="n">notif</span><span class="p">[</span><span class="s2">&quot;notification_date&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;notification_method&quot;</span><span class="p">:</span> <span class="n">notif</span><span class="p">[</span><span class="s2">&quot;notification_method&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;undergrad_gpa&quot;</span><span class="p">:</span> <span class="n">to_float</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;undergrad_gpa&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;gre_general&quot;</span><span class="p">:</span> <span class="n">to_int</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gre_general&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;gre_verbal&quot;</span><span class="p">:</span> <span class="n">to_int</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gre_verbal&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;gre_aw&quot;</span><span class="p">:</span> <span class="n">to_float</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gre_aw&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;notes&quot;</span><span class="p">:</span> <span class="n">blank_to_none</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;notes&quot;</span><span class="p">)),</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">cleaned</span></div>
+
+
+
+<span class="c1">## ============================================================</span>
+<span class="c1">## Main pipeline: load JSON, clean all records, and save output JSON</span>
+<span class="c1">## ============================================================</span>
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../api.html#clean.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Load applicant_data.json, clean all records, and write cleaned_applicant_data.json.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">INPUT_JSON</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">records</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+    <span class="n">cleaned_records</span> <span class="o">=</span> <span class="p">[</span><span class="n">clean_record</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">records</span><span class="p">]</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">OUTPUT_JSON</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">cleaned_records</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">)</span><span class="si">}</span><span class="s2"> records from </span><span class="si">{</span><span class="n">INPUT_JSON</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wrote </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">cleaned_records</span><span class="p">)</span><span class="si">}</span><span class="s2"> cleaned records to </span><span class="si">{</span><span class="n">OUTPUT_JSON</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Andres Sanchez-Castellanos.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

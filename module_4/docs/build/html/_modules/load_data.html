@@ -1,0 +1,407 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>load_data &mdash; Andres&#39; GradCafe Analytics 0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=2709fde1"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Andres' GradCafe Analytics
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testing.html">Testing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Andres' GradCafe Analytics</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Module code</a></li>
+      <li class="breadcrumb-item active">load_data</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for load_data</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">load_data.py</span>
+
+<span class="sd">Loads GradCafe data into PostgreSQL.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">psycopg</span>
+
+
+<span class="c1"># --------------------</span>
+<span class="c1"># DATABASE CONFIG</span>
+<span class="c1"># --------------------</span>
+
+<span class="n">DB_NAME</span> <span class="o">=</span> <span class="s2">&quot;module_3db&quot;</span>
+<span class="n">DB_USER</span> <span class="o">=</span> <span class="s2">&quot;postgres&quot;</span>
+<span class="n">DB_PASSWORD</span> <span class="o">=</span> <span class="s2">&quot;Aasc060602&quot;</span>
+<span class="n">DB_HOST</span> <span class="o">=</span> <span class="s2">&quot;localhost&quot;</span>
+<span class="n">DB_PORT</span> <span class="o">=</span> <span class="mi">5432</span>
+
+
+<span class="c1"># --------------------</span>
+<span class="c1"># INPUT FILE</span>
+<span class="c1"># --------------------</span>
+<span class="n">INPUT_JSON</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;../module_3/llm_extend_applicant_data.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># --------------------</span>
+<span class="c1"># HELPERS</span>
+<span class="c1"># --------------------</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">clean_text</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\x00</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">s</span> <span class="k">if</span> <span class="n">s</span> <span class="k">else</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">to_float</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+    <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+    <span class="n">s</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="c1"># Handles things like &quot;GPA 3.89&quot; or &quot;3.89&quot;</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(-?\d+(?:\.\d+)?)&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">m</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="parse_date_ddmmyyyy">
+<a class="viewcode-back" href="../api.html#load_data.parse_date_ddmmyyyy">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_date_ddmmyyyy</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert &#39;30/01/2026&#39; -&gt; date (your old dataset)&quot;&quot;&quot;</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">/%m/%Y&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="parse_date_monthname">
+<a class="viewcode-back" href="../api.html#load_data.parse_date_monthname">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_date_monthname</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert &#39;January 31, 2026&#39; -&gt; date (professor dataset)&quot;&quot;&quot;</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s2">&quot;%B </span><span class="si">%d</span><span class="s2">, %Y&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">date</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">derive_term_from_date</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">d</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Fall </span><span class="si">{</span><span class="n">d</span><span class="o">.</span><span class="n">year</span><span class="si">}</span><span class="s2">&quot;</span>
+
+
+<div class="viewcode-block" id="join_program">
+<a class="viewcode-back" href="../api.html#load_data.join_program">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">join_program</span><span class="p">(</span><span class="n">institution</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">program</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Professor LLM file already has combined &quot;program&quot;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">inst</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">institution</span><span class="p">)</span>
+    <span class="n">prog</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">program</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">inst</span> <span class="ow">and</span> <span class="n">prog</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">inst</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">prog</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="k">return</span> <span class="n">inst</span> <span class="ow">or</span> <span class="n">prog</span></div>
+
+
+
+<div class="viewcode-block" id="read_records">
+<a class="viewcode-back" href="../api.html#load_data.read_records">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">read_records</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reads either:</span>
+<span class="sd">    - JSON list</span>
+<span class="sd">    - JSONL (one json object per line)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">raw</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">data</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Top-level JSON is not a list (this file might be JSONL).&quot;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+        <span class="c1"># JSONL fallback</span>
+        <span class="n">records</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">records</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">records</span></div>
+
+
+
+<div class="viewcode-block" id="normalize_row">
+<a class="viewcode-back" href="../api.html#load_data.normalize_row">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_row</span><span class="p">(</span><span class="n">row</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Map BOTH dataset styles into the DB columns created.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># ----- term -----</span>
+    <span class="n">term</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;semester_year_start&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">term</span><span class="p">:</span>
+        <span class="c1"># Your file: derive from notification_date dd/mm/yyyy</span>
+        <span class="n">d_notification</span> <span class="o">=</span> <span class="n">parse_date_ddmmyyyy</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;notification_date&quot;</span><span class="p">))</span>
+        <span class="n">term</span> <span class="o">=</span> <span class="n">derive_term_from_date</span><span class="p">(</span><span class="n">d_notification</span><span class="p">)</span>
+
+    <span class="c1"># ----- date_added -----</span>
+    <span class="n">date_added</span> <span class="o">=</span> <span class="n">parse_date_monthname</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;date_added&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">date_added</span><span class="p">:</span>
+        <span class="c1"># Your: notification_date dd/mm/yyyy</span>
+        <span class="n">date_added</span> <span class="o">=</span> <span class="n">parse_date_ddmmyyyy</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;notification_date&quot;</span><span class="p">))</span>
+
+    <span class="c1"># ----- status -----</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;applicant_status&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">status</span><span class="p">:</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;decision&quot;</span><span class="p">))</span>
+
+    <span class="c1"># ----- citizenship / country -----</span>
+    <span class="n">citizenship</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;citizenship&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">citizenship</span><span class="p">:</span>
+        <span class="n">citizenship</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;country_of_origin&quot;</span><span class="p">))</span>
+
+    <span class="c1"># ----- degree -----</span>
+    <span class="n">degree</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;masters_or_phd&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">degree</span><span class="p">:</span>
+        <span class="n">degree</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;degree&quot;</span><span class="p">))</span>
+
+    <span class="c1"># ----- program -----</span>
+    <span class="n">program</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;program&quot;</span><span class="p">))</span>
+    <span class="c1"># Your file: combine institution + program (if needed)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">program</span><span class="p">:</span>
+        <span class="n">program</span> <span class="o">=</span> <span class="n">join_program</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;institution&quot;</span><span class="p">),</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;program&quot;</span><span class="p">))</span>
+
+    <span class="c1"># ----- comments -----</span>
+    <span class="n">comments</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;comments&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">comments</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">comments</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;notes&quot;</span><span class="p">))</span>
+
+    <span class="c1"># ----- llm fields -----</span>
+    <span class="n">llm_prog</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;llm-generated-program&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">llm_prog</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">llm_prog</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;llm_generated_program&quot;</span><span class="p">))</span>
+
+    <span class="n">llm_uni</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;llm-generated-university&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">llm_uni</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">llm_uni</span> <span class="o">=</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;llm_generated_university&quot;</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;program&quot;</span><span class="p">:</span> <span class="n">program</span><span class="p">,</span>
+        <span class="s2">&quot;comments&quot;</span><span class="p">:</span> <span class="n">comments</span><span class="p">,</span>
+        <span class="s2">&quot;date_added&quot;</span><span class="p">:</span> <span class="n">date_added</span><span class="p">,</span>
+        <span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="n">clean_text</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">status</span><span class="p">,</span>
+        <span class="s2">&quot;term&quot;</span><span class="p">:</span> <span class="n">term</span><span class="p">,</span>
+        <span class="s2">&quot;country&quot;</span><span class="p">:</span> <span class="n">citizenship</span><span class="p">,</span>
+        <span class="s2">&quot;gpa&quot;</span><span class="p">:</span> <span class="n">to_float</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gpa&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;gpa&quot;</span> <span class="ow">in</span> <span class="n">row</span> <span class="k">else</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;undergrad_gpa&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;gre&quot;</span><span class="p">:</span> <span class="n">to_float</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gre&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;gre&quot;</span> <span class="ow">in</span> <span class="n">row</span> <span class="k">else</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gre_general&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;gre_v&quot;</span><span class="p">:</span> <span class="n">to_float</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gre_v&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;gre_v&quot;</span> <span class="ow">in</span> <span class="n">row</span> <span class="k">else</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gre_verbal&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;gre_aw&quot;</span><span class="p">:</span> <span class="n">to_float</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gre_aw&quot;</span><span class="p">)),</span>
+        <span class="s2">&quot;degree&quot;</span><span class="p">:</span> <span class="n">degree</span><span class="p">,</span>
+        <span class="s2">&quot;llm_program&quot;</span><span class="p">:</span> <span class="n">llm_prog</span><span class="p">,</span>
+        <span class="s2">&quot;llm_university&quot;</span><span class="p">:</span> <span class="n">llm_uni</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<span class="c1"># --------------------</span>
+<span class="c1"># MAIN</span>
+<span class="c1"># --------------------</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">INPUT_JSON</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="n">INPUT_JSON</span><span class="p">)</span>
+
+    <span class="n">records</span> <span class="o">=</span> <span class="n">read_records</span><span class="p">(</span><span class="n">INPUT_JSON</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">records</span><span class="p">)</span><span class="si">}</span><span class="s2"> records from </span><span class="si">{</span><span class="n">INPUT_JSON</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">db_url</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;DATABASE_URL&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">db_url</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;DATABASE_URL environment variable is not set.&quot;</span><span class="p">)</span>
+
+    <span class="n">conn</span> <span class="o">=</span> <span class="n">psycopg</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">db_url</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">conn</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cur</span><span class="p">:</span>
+            <span class="n">cur</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                DO $$</span>
+<span class="s2">                BEGIN</span>
+<span class="s2">                    IF NOT EXISTS (</span>
+<span class="s2">                        SELECT 1</span>
+<span class="s2">                        FROM pg_constraint</span>
+<span class="s2">                        WHERE conname = &#39;applicants_url_unique&#39;</span>
+<span class="s2">                    ) THEN</span>
+<span class="s2">                        ALTER TABLE applicants</span>
+<span class="s2">                        ADD CONSTRAINT applicants_url_unique UNIQUE (url);</span>
+<span class="s2">                    END IF;</span>
+<span class="s2">                END</span>
+<span class="s2">                $$;</span>
+<span class="s2">            &quot;&quot;&quot;</span><span class="p">)</span>
+
+
+    <span class="n">INSERT_SQL</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    INSERT INTO applicants (</span>
+<span class="s2">        program,</span>
+<span class="s2">        comments,</span>
+<span class="s2">        date_added,</span>
+<span class="s2">        url,</span>
+<span class="s2">        status,</span>
+<span class="s2">        term,</span>
+<span class="s2">        us_or_international,</span>
+<span class="s2">        gpa,</span>
+<span class="s2">        gre,</span>
+<span class="s2">        gre_v,</span>
+<span class="s2">        gre_aw,</span>
+<span class="s2">        degree,</span>
+<span class="s2">        llm_generated_program,</span>
+<span class="s2">        llm_generated_university</span>
+<span class="s2">    )</span>
+<span class="s2">    VALUES (</span>
+<span class="s2">        </span><span class="si">%(program)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(comments)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(date_added)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(url)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(status)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(term)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(country)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(gpa)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(gre)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(gre_v)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(gre_aw)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(degree)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(llm_program)s</span><span class="s2">,</span>
+<span class="s2">        </span><span class="si">%(llm_university)s</span>
+<span class="s2">    )</span>
+<span class="s2">    ON CONFLICT (url) DO NOTHING;</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+
+    <span class="n">inserted</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">with</span> <span class="n">conn</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cur</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">normalize_row</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+                <span class="n">cur</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">INSERT_SQL</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+                <span class="n">inserted</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Inserted </span><span class="si">{</span><span class="n">inserted</span><span class="si">}</span><span class="s2"> rows.&quot;</span><span class="p">)</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Andres Sanchez-Castellanos.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -30,7 +30,7 @@ DB_PORT = 5432
 # --------------------
 # INPUT FILE
 # --------------------
-INPUT_JSON = Path("../module_3/llm_extend_applicant_data.json")
+INPUT_JSON = Path("../module_4/src/llm_extend_applicant_data.json")
 
 # --------------------
 # HELPERS
@@ -215,26 +215,6 @@ def main():
     if not db_url:
         raise RuntimeError("DATABASE_URL environment variable is not set.")
 
-    conn = psycopg.connect(db_url)
-
-    with conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM pg_constraint
-                        WHERE conname = 'applicants_url_unique'
-                    ) THEN
-                        ALTER TABLE applicants
-                        ADD CONSTRAINT applicants_url_unique UNIQUE (url);
-                    END IF;
-                END
-                $$;
-            """)
-
-
     INSERT_SQL = """
     INSERT INTO applicants (
         program,
@@ -273,14 +253,37 @@ def main():
 
     inserted = 0
 
-    with conn:
+    # Open ONE connection context and do everything inside it
+    with psycopg.connect(db_url) as conn:
         with conn.cursor() as cur:
+            # Ensure uniqueness constraint exists (safe to run repeatedly)
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'applicants_url_unique'
+                    ) THEN
+                        ALTER TABLE applicants
+                        ADD CONSTRAINT applicants_url_unique UNIQUE (url);
+                    END IF;
+                END
+                $$;
+            """)
+
+            # Insert all rows
             for row in records:
                 data = normalize_row(row)
                 cur.execute(INSERT_SQL, data)
+
+                # Count "attempted inserts" (not true inserted rows)
                 inserted += 1
 
-    conn.close()
+        # conn commits automatically on clean exit of the with-block
+
+    print(f"Processed {inserted} rows (attempted inserts).")
+
     print(f"Inserted {inserted} rows.")
 
 
