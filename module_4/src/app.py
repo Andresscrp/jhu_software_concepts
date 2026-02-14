@@ -578,9 +578,7 @@ def run_pull_pipeline() -> None:
 
     Prevents concurrent execution using a lock file.
     """
-
     try:
-
         create_lock()
 
         scrape = ROOT_DIR / "module_3" / "scrape.py"
@@ -592,13 +590,9 @@ def run_pull_pipeline() -> None:
         if clean.exists():
             subprocess.run(["python", str(clean)], check=True)
 
-        subprocess.run(
-            ["python", str(APP_DIR / "load_data.py")],
-            check=True
-        )
+        subprocess.run(["python", str(APP_DIR / "load_data.py")], check=True)
 
     finally:
-
         remove_lock()
 
 

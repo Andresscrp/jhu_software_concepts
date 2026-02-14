@@ -148,3 +148,5 @@ def main() -> None:
     print(f"Loaded {len(records)} records from {INPUT_JSON}")
     print(f"Wrote {len(cleaned_records)} cleaned records to {OUTPUT_JSON}")
 
+if __name__ == "__main__":
+    main()

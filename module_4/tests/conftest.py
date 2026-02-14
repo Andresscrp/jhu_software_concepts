@@ -1,35 +1,35 @@
-"""
-conftest.py
-
-Shared pytest fixtures for the Module 4 test suite.
-
-Provides a Flask test client that does not touch the network or database
-(by monkeypatching build_blocks and lock_exists).
-"""
+import os
 
 import pytest
+
 import src.app as appmod
 
 
-def _fake_blocks():
-    """Return deterministic blocks so /analysis can render without Postgres."""
-    return [{
-        "title": "Q1) Fake",
-        "headers": ["col"],
-        "rows": [(1,)],
-    }]
+# If the user/CI didn't set DATABASE_URL, give tests a default.
+# (CI Postgres service usually uses postgres/postgres on db "postgres")
+os.environ.setdefault("DATABASE_URL", "postgresql://postgres:Aasc060602@localhost:5432/module_3db")
 
 
-@pytest.fixture
-def client(monkeypatch):
-    """
-    Create a Flask test client with DB/network work patched out.
+@pytest.fixture()
+def app():
+    # Web/page tests should NOT hit the real database.
+    fake_blocks = [
+        {
+            "title": "Dummy Analysis Block",
+            "headers": ["col"],
+            "rows": [(1,)],
+        }
+    ]
 
-    This makes /analysis return 200 consistently in tests.
-    """
-    monkeypatch.setattr(appmod, "build_blocks", _fake_blocks)
-    monkeypatch.setattr(appmod, "lock_exists", lambda: False)
-
-    app = appmod.create_app()
+    app = appmod.create_app(
+        build_blocks_fn=lambda: fake_blocks,
+        lock_exists_fn=lambda: False,
+        run_pull_fn=lambda: None,
+    )
     app.config.update(TESTING=True)
+    return app
+
+
+@pytest.fixture()
+def client(app):
     return app.test_client()

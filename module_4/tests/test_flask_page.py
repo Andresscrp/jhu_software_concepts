@@ -64,3 +64,14 @@ def test_get_analysis_page_loads(client):
 
     assert "Pull Data" in pull_btn.get_text(strip=True)
     assert "Update Analysis" in update_btn.get_text(strip=True)
+
+@pytest.mark.web
+def test_get_conn_raises_when_no_db_url(monkeypatch):
+    import src.app as app
+
+    # Remove env var
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    with pytest.raises(RuntimeError):
+        app.get_conn()
+
