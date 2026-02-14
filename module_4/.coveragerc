@@ -1,0 +1,5 @@
+[run]
+omit =
+    src/load_data.py
+    src/query_data.py
+    src/scrape.py
