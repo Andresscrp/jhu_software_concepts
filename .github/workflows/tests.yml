@@ -41,3 +41,6 @@ jobs:
       - name: Run tests
         run: |
           pytest module_4 -m "web or buttons or analysis or db or integration"
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+  PYTHONPATH: ${{ github.workspace }}/module_4
