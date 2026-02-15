@@ -5,9 +5,6 @@ build:
   tools:
     python: "3.12"
 
-  env:
-    PYTHONPATH: module_4
-
 sphinx:
   configuration: module_4/docs/source/conf.py
 
