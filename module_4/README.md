@@ -27,7 +27,8 @@ This project extends the GradCafe analytics service from Module 3 by adding:
 - A complete Pytest suite covering the Flask UI, button behavior, formatting rules, database inserts, and end-to-end flows
 - 100% test coverage enforced via `pytest-cov` (`--cov-fail-under=100`)
 - Test organization using required Pytest markers
-- Sphinx documentation
+- Sphinx documentation: https://app.readthedocs.org/projects/jhu-software-concepts-andres/builds/31417577/
+    Select "View docs"
 - Continuous Integration using GitHub Actions
 
 The Flask app serves an **Analysis** page and exposes two endpoints:
