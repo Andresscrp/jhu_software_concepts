@@ -3,7 +3,6 @@ import runpy
 
 import pytest
 
-
 @pytest.mark.analysis
 def test_clean_main_runs_and_writes_file(tmp_path, monkeypatch):
     """

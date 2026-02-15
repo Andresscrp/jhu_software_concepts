@@ -3,7 +3,7 @@ import re
 import pytest
 from bs4 import BeautifulSoup
 
-import src.app as appmod
+from src import app as appmod
 
 
 @pytest.mark.analysis

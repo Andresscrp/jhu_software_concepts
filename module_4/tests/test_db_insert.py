@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 import psycopg
 
-import src.app as appmod
+from src import app as appmod
 
 
 REQUIRED_NON_NULL_COLS = [

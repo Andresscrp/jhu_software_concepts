@@ -1,12 +1,12 @@
+import os
 import pytest
 
-import src.app as appmod
-import os
+from src import app as appmod
 
 # Ensures db-marked tests always have a DB URL
 os.environ.setdefault(
     "DATABASE_URL",
-    "postgresql://postgres:Aasc060602@localhost:5432/module_3db",
+    "postgresql://postgres:postgres@localhost:5432/postgres"
 )
 
 @pytest.fixture()

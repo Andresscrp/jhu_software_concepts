@@ -1,5 +1,6 @@
 import pytest
-import src.app as appmod
+from src import app as appmod
+
 
 
 @pytest.mark.buttons

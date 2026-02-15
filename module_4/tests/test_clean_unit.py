@@ -12,7 +12,7 @@ These tests are pure (no file I/O) and drive coverage for:
 """
 
 import pytest
-
+from src import app as appmod
 import src.clean as clean
 
 

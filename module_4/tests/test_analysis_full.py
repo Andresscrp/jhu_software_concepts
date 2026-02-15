@@ -1,5 +1,6 @@
 import pytest
-import src.app as appmod
+from src import app as appmod
+
 
 
 def fake_fetch_one(sql, params=None):
