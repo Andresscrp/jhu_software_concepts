@@ -16,6 +16,12 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+autodoc_mock_imports = [
+    "psycopg",
+    "psycopg_binary",
+    "bs4",
+    "flask",
+]
 project = "Andres' GradCafe Analytics"
 copyright = '2026, Andres Sanchez-Castellanos'
 author = 'Andres Sanchez-Castellanos'
