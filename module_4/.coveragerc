@@ -1,7 +1,6 @@
 [run]
-source = module_4/src
-
+source = src
 omit =
-    module_4/src/load_data.py
-    module_4/src/query_data.py
-    module_4/src/scrape.py
+    src/load_data.py
+    src/query_data.py
+    src/scrape.py
