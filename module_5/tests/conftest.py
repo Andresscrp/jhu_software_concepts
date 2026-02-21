@@ -1,3 +1,5 @@
+# module_5/tests/conftest.py
+
 """
 conftest.py
 
@@ -19,7 +21,7 @@ os.environ.setdefault(
 
 
 @pytest.fixture()
-def flask_app():
+def test_app():
     """
     Create a Flask app instance configured for testing.
 
@@ -44,14 +46,16 @@ def flask_app():
 
 
 @pytest.fixture()
+def flask_app(test_app):
+    """
+    Backwards-compatible alias (some tests expect flask_app).
+    """
+    return test_app
+
+
+@pytest.fixture()
 def client(test_app):
     """
     Create a Flask test client from the testing app fixture.
-
-    Args:
-        test_app: The Flask application instance under test.
-
-    Returns:
-        A Flask test client.
     """
     return test_app.test_client()

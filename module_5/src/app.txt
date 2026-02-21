@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import threading
 from pathlib import Path
 from typing import Any
@@ -141,10 +140,14 @@ PAGE = """
         Re-runs the SQL queries and refreshes the dashboard using the data already in PostgreSQL.
       </div>
     </form>
+
+
   </div>
+
 
   <div class="note">
     <form method="post" action="{{ url_for('pull_data') }}">
+
       <button class="btn"
               type="submit"
               data-testid="pull-data-btn"
@@ -153,22 +156,32 @@ PAGE = """
       </button>
 
       <span style="margin-left:10px;">
+
         Pull Data fetches the latest GradCafe results, processes them, and updates the analysis database.
+
         {% if pulling %}
           <b>Pull currently running.</b>
         {% endif %}
+
       </span>
+
     </form>
   </div>
 
+
   {% for block in blocks %}
+
     <div class="card">
+
       <div><b>{{ block.title }}</b></div>
       <div><b>Answer:</b></div>
 
       <div class="mono" style="margin-top:8px;">
+
         {% if block.rows and block.headers %}
+
           <table>
+
             <thead>
               <tr>
                 {% for h in block.headers %}
@@ -178,21 +191,31 @@ PAGE = """
             </thead>
 
             <tbody>
+
               {% for r in block.rows %}
                 <tr>
+
                   {% for cell in r %}
                     <td>{{ cell }}</td>
                   {% endfor %}
+
                 </tr>
               {% endfor %}
+
             </tbody>
 
           </table>
+
         {% else %}
+
           <div>No results.</div>
+
         {% endif %}
+
       </div>
+
     </div>
+
   {% endfor %}
 
 </body>
@@ -256,23 +279,6 @@ def get_conn() -> psycopg.Connection:
 # Query Helper
 # --------------------------------------------------
 
-def _ensure_limit(sql: str) -> str:
-    """
-    Ensure a SQL string includes a LIMIT clause.
-
-    If the query already contains LIMIT (case-insensitive), it is returned unchanged.
-    Otherwise, a conservative "LIMIT 1" is appended.
-
-    Args:
-        sql: SQL query string.
-
-    Returns:
-        SQL query string guaranteed to contain a LIMIT clause.
-    """
-    normalized = sql_utils.normalize_sql(sql)
-    return normalized if sql_utils.has_limit(normalized) else f"{normalized} LIMIT 1"
-
-
 def fetch_one(
     sql: str,
     params: dict[str, Any] | None = None,
@@ -280,7 +286,8 @@ def fetch_one(
     """
     Execute a SQL query and return column headers and rows.
 
-    Normalizes whitespace and guarantees a LIMIT clause (adds LIMIT 1 if missing).
+    Enforces normalized SQL formatting and ensures that every query contains
+    a LIMIT clause for safety.
 
     Args:
         sql: SQL query string.
@@ -291,8 +298,8 @@ def fetch_one(
     """
     with get_conn() as conn:
         with conn.cursor() as cur:
-            safe_sql = _ensure_limit(sql)
-            cur.execute(safe_sql, params or {})
+            sql = sql_utils.require_limit(sql_utils.normalize_sql(sql))
+            cur.execute(sql, params or {})
             rows = cur.fetchall()
             headers = [d.name for d in cur.description] if cur.description else []
 
@@ -319,6 +326,7 @@ def build_blocks() -> list[dict[str, Any]]:
         "LIMIT 1;",
         {"t": FALL_2026},
     )
+
     blocks.append(
         {
             "title": (
@@ -350,6 +358,7 @@ def build_blocks() -> list[dict[str, Any]]:
         LIMIT 1;
         """
     )
+
     blocks.append(
         {
             "title": "Q2) What percentage of entries are from international students?",
@@ -372,6 +381,7 @@ def build_blocks() -> list[dict[str, Any]]:
         LIMIT 1;
         """
     )
+
     blocks.append(
         {
             "title": (
@@ -395,6 +405,7 @@ def build_blocks() -> list[dict[str, Any]]:
         """,
         {"t": FALL_2026},
     )
+
     blocks.append(
         {
             "title": "Q4) What is the average GPA of American students in Fall 2026?",
@@ -421,6 +432,7 @@ def build_blocks() -> list[dict[str, Any]]:
         """,
         {"t": FALL_2026},
     )
+
     blocks.append(
         {
             "title": "Q5) What percent of entries for Fall 2026 are Acceptances?",
@@ -441,6 +453,7 @@ def build_blocks() -> list[dict[str, Any]]:
         """,
         {"t": FALL_2026},
     )
+
     blocks.append(
         {
             "title": (
@@ -467,6 +480,7 @@ def build_blocks() -> list[dict[str, Any]]:
         LIMIT 1;
         """
     )
+
     blocks.append(
         {
             "title": (
@@ -497,6 +511,7 @@ def build_blocks() -> list[dict[str, Any]]:
         """,
         {"t": FALL_2026},
     )
+
     blocks.append(
         {
             "title": (
@@ -517,7 +532,8 @@ def build_blocks() -> list[dict[str, Any]]:
         WHERE term=%(t)s
           AND status='Accepted'
           AND degree ILIKE 'phd%%'
-          AND llm_generated_program ILIKE '%%computer science%%'
+          AND llm_generated_program
+              ILIKE '%%computer science%%'
           AND (
             llm_generated_university ILIKE '%%georgetown%%'
             OR llm_generated_university ILIKE '%%mit%%'
@@ -528,6 +544,7 @@ def build_blocks() -> list[dict[str, Any]]:
         """,
         {"t": FALL_2026},
     )
+
     blocks.append(
         {
             "title": (
@@ -562,6 +579,7 @@ def build_blocks() -> list[dict[str, Any]]:
         """,
         {"t": FALL_2026, "n": MIN_SAMPLE_Q10},
     )
+
     blocks.append(
         {
             "title": "Q10) What are the top 10 programs with the highest acceptance rate?",
@@ -581,10 +599,11 @@ def build_blocks() -> list[dict[str, Any]]:
           AND gre>0
         GROUP BY status
         ORDER BY 2 DESC
-        LIMIT 100;
+        LIMIT 1;
         """,
         {"t": FALL_2026},
     )
+
     blocks.append(
         {
             "title": "Q11) What is the average GRE of each status category?",
@@ -600,13 +619,16 @@ def build_blocks() -> list[dict[str, Any]]:
 # Data Pipeline
 # --------------------------------------------------
 
-def run_pull_pipeline() -> None:  # pragma: no cover
+def run_pull_pipeline() -> None:
     """
     Execute scraping, cleaning, and loading pipeline.
 
     Prevents concurrent execution using a lock file.
-    Uses the current Python interpreter to avoid Windows launcher/PATH issues.
+    Uses the current Python interpreter to avoid Windows
+    launcher and PATH resolution issues.
     """
+    import sys
+
     try:
         create_lock()
 
@@ -619,7 +641,10 @@ def run_pull_pipeline() -> None:  # pragma: no cover
         if clean.exists():
             subprocess.run([sys.executable, str(clean)], check=True)
 
-        subprocess.run([sys.executable, str(APP_DIR / "load_data.py")], check=True)
+        subprocess.run(
+            [sys.executable, str(APP_DIR / "load_data.py")],
+            check=True,
+        )
 
     finally:
         remove_lock()
@@ -646,6 +671,7 @@ def create_app(
     Returns:
         Configured Flask app instance for running or testing.
     """
+    # Run lightweight sql_utils coverage hook (doesn't change app behavior)
     sql_utils.cover()
 
     flask_app = Flask(__name__)
@@ -684,6 +710,11 @@ def create_app(
 
 app = create_app()
 
-if __name__ == "__main__":  # pragma: no cover
-    # Run the Flask development server (local use only).
+if __name__ == "__main__":
+    """
+    Run the Flask development server.
+
+    This is only for local development. In production/CI, the app object is
+    imported and served by a WSGI server instead.
+    """
     app.run(host="127.0.0.1", port=5000, debug=True)

@@ -17,9 +17,24 @@ import psycopg
 
 
 # --------------------
+# DATABASE CONFIG
+# --------------------
+
+DB_NAME = "module_3db"
+DB_USER = "postgres"
+DB_PASSWORD = "Aasc060602"
+DB_HOST = "localhost"
+DB_PORT = 5432
+
+
+# --------------------
 # INPUT FILE
 # --------------------
-INPUT_JSON = Path("../module_5/src/llm_extend_applicant_data.json")
+INPUT_JSON = Path("../module_4/src/llm_extend_applicant_data.json")
+
+# --------------------
+# HELPERS
+# --------------------
 
 
 def clean_text(x: Any) -> Optional[str]:
@@ -50,6 +65,7 @@ def to_float(x: Any) -> Optional[float]:
     if not s:
         return None
 
+    # Handles things like "GPA 3.89" or "3.89"
     m = re.search(r"(-?\d+(?:\.\d+)?)", s)
     if not m:
         return None
@@ -122,6 +138,7 @@ def read_records(path: Path) -> List[Dict[str, Any]]:
             return data
         raise ValueError("Top-level JSON is not a list (this file might be JSONL).")
     except json.JSONDecodeError:
+        # JSONL fallback
         records: List[Dict[str, Any]] = []
         with path.open("r", encoding="utf-8") as f:
             for line in f:
@@ -139,35 +156,46 @@ def normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
     This supports both the professor-provided LLM dataset and the earlier scraped
     dataset format by normalizing keys and data types.
     """
+    # ----- term -----
     term = clean_text(row.get("semester_year_start"))
     if not term:
+        # Your file: derive from notification_date dd/mm/yyyy
         d_notification = parse_date_ddmmyyyy(row.get("notification_date"))
         term = derive_term_from_date(d_notification)
 
+    # ----- date_added -----
     date_added = parse_date_monthname(row.get("date_added"))
     if not date_added:
+        # Your: notification_date dd/mm/yyyy
         date_added = parse_date_ddmmyyyy(row.get("notification_date"))
 
+    # ----- status -----
     status = clean_text(row.get("applicant_status"))
     if not status:
         status = clean_text(row.get("decision"))
 
+    # ----- citizenship / country -----
     citizenship = clean_text(row.get("citizenship"))
     if not citizenship:
         citizenship = clean_text(row.get("country_of_origin"))
 
+    # ----- degree -----
     degree = clean_text(row.get("masters_or_phd"))
     if not degree:
         degree = clean_text(row.get("degree"))
 
+    # ----- program -----
     program = clean_text(row.get("program"))
+    # Your file: combine institution + program (if needed)
     if not program:
         program = join_program(row.get("institution"), row.get("program"))
 
+    # ----- comments -----
     comments = clean_text(row.get("comments"))
     if comments is None:
         comments = clean_text(row.get("notes"))
 
+    # ----- llm fields -----
     llm_prog = clean_text(row.get("llm-generated-program"))
     if llm_prog is None:
         llm_prog = clean_text(row.get("llm_generated_program"))
@@ -194,84 +222,16 @@ def normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _build_db_url_from_parts() -> Optional[str]:
-    """
-    Build a DATABASE_URL from DB_* environment variables.
-
-    Returns:
-        A PostgreSQL connection URL string if all required variables are present;
-        otherwise None.
-    """
-    host = os.getenv("DB_HOST")
-    port = os.getenv("DB_PORT")
-    name = os.getenv("DB_NAME")
-    user = os.getenv("DB_USER")
-    password = os.getenv("DB_PASSWORD")
-
-    if not all([host, port, name, user, password]):
-        return None
-
-    return f"postgresql://{user}:{password}@{host}:{port}/{name}"
-
-
-def _get_database_url() -> str:
-    """
-    Resolve the database connection URL.
-
-    Prefers a fully-specified DATABASE_URL, otherwise falls back to DB_* variables.
-
-    Raises:
-        RuntimeError: If no usable configuration is found.
-    """
-    db_url = os.getenv("DATABASE_URL")
-    if db_url:
-        return db_url
-
-    composed = _build_db_url_from_parts()
-    if composed:
-        return composed
-
-    raise RuntimeError(
-        "Database config missing. Set DATABASE_URL or set "
-        "DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD."
-    )
-
-
-def ensure_applicants_table(cur: psycopg.Cursor) -> None:
-    """
-    Ensure the 'applicants' table exists.
-
-    Creates the table with the columns used by this loader. p_id is generated
-    automatically and does not need to be inserted explicitly.
-    """
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS applicants (
-            p_id SERIAL PRIMARY KEY,
-            program TEXT,
-            comments TEXT,
-            date_added DATE,
-            url TEXT,
-            status TEXT,
-            term TEXT,
-            us_or_international TEXT,
-            gpa DOUBLE PRECISION,
-            gre DOUBLE PRECISION,
-            gre_v DOUBLE PRECISION,
-            gre_aw DOUBLE PRECISION,
-            degree TEXT,
-            llm_generated_program TEXT,
-            llm_generated_university TEXT
-        );
-        """
-    )
+# --------------------
+# MAIN
+# --------------------
 
 
 def main() -> None:
     """
     Load the input JSON records and insert normalized rows into PostgreSQL.
 
-    The database connection is read from environment variables.
+    The database connection is read from the DATABASE_URL environment variable.
     """
     if not INPUT_JSON.exists():
         raise FileNotFoundError(INPUT_JSON)
@@ -279,7 +239,9 @@ def main() -> None:
     records = read_records(INPUT_JSON)
     print(f"Loaded {len(records)} records from {INPUT_JSON}")
 
-    db_url = _get_database_url()
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL environment variable is not set.")
 
     insert_sql = """
     INSERT INTO applicants (
@@ -314,22 +276,44 @@ def main() -> None:
         %(llm_program)s,
         %(llm_university)s
     )
-    ON CONFLICT DO NOTHING;
+    ON CONFLICT (url) DO NOTHING;
     """
 
-    attempted = 0
+    inserted = 0
 
+    # Open ONE connection context and do everything inside it
     with psycopg.connect(db_url) as conn:
         with conn.cursor() as cur:
-            ensure_applicants_table(cur)
+            # Ensure uniqueness constraint exists (safe to run repeatedly)
+            cur.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname = 'applicants_url_unique'
+                    ) THEN
+                        ALTER TABLE applicants
+                        ADD CONSTRAINT applicants_url_unique UNIQUE (url);
+                    END IF;
+                END
+                $$;
+                """
+            )
 
+            # Insert all rows
             for row in records:
                 data = normalize_row(row)
                 cur.execute(insert_sql, data)
-                attempted += 1
 
-    print(f"Processed {attempted} rows (attempted inserts).")
-    print(f"Inserted {attempted} rows.")
+                # Count "attempted inserts" (not true inserted rows)
+                inserted += 1
+
+        # conn commits automatically on clean exit of the with-block
+
+    print(f"Processed {inserted} rows (attempted inserts).")
+    print(f"Inserted {inserted} rows.")
 
 
 if __name__ == "__main__":
