@@ -1,4 +1,4 @@
-name: tests
+name: Module 5 CI
 
 on:
   push:
@@ -25,6 +25,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -33,19 +34,37 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install deps (module_4)
-        working-directory: module_4
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz
+
+      - name: Install Python deps
+        working-directory: module_5
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -e .
 
-      - name: Run tests with coverage (module_4)
-        working-directory: module_4
-        env:
-          PYTHONPATH: ${{ github.workspace }}/module_4
+      - name: Run pylint
+        working-directory: module_5
         run: |
-          pytest -o addopts= -m "web or buttons or analysis or db or integration" \
-            --cov=src \
-            --cov-config=.coveragerc \
-            --cov-report=term-missing \
-            --cov-fail-under=100
+          python -m pylint src --fail-under=10
+
+      - name: Generate dependency graph
+        working-directory: module_5
+        run: |
+          pydeps src/app.py --noshow -T svg -o dependency.svg
+          test -f dependency.svg
+
+      - name: Run Snyk
+        working-directory: module_5
+        run: |
+          snyk test || true
+
+      - name: Run tests
+        working-directory: module_5
+        env:
+          PYTHONPATH: ${{ github.workspace }}/module_5
+        run: |
+          pytest --cov=src --cov-fail-under=100
