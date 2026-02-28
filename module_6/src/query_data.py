@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 """
 query_data.py
 

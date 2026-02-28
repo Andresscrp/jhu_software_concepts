@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 # module_5/src/app.py
 
 """
@@ -24,7 +25,7 @@ from typing import Any
 from flask import Flask, current_app, jsonify, redirect, render_template_string, url_for
 import psycopg
 
-from src import sql_utils
+from . import sql_utils
 
 
 # --------------------------------------------------
@@ -681,6 +682,7 @@ def create_app(
 
     return flask_app
 
+
 def main() -> None:
     """
     Docker entrypoint helper.
@@ -693,8 +695,9 @@ def main() -> None:
     port = int(os.getenv("FLASK_PORT", "8080"))
     debug = os.getenv("FLASK_DEBUG", "true").lower() in ("1", "true", "yes", "y")
 
-    app = create_app()
-    app.run(host=host, port=port, debug=debug)
+    flask_app = create_app()
+    flask_app.run(host=host, port=port, debug=debug)
+
 
 app = create_app()
 

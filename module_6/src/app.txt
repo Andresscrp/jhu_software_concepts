@@ -681,9 +681,22 @@ def create_app(
 
     return flask_app
 
+def main() -> None:
+    """
+    Docker entrypoint helper.
+
+    Some Docker configs import `main` from src.app (run.py: `from src.app import main`).
+    This function starts the Flask dev server using the same settings as __main__.
+    """
+    # Use env vars if present (nice for Docker), otherwise your defaults.
+    host = os.getenv("FLASK_HOST", "0.0.0.0")
+    port = int(os.getenv("FLASK_PORT", "8080"))
+    debug = os.getenv("FLASK_DEBUG", "true").lower() in ("1", "true", "yes", "y")
+
+    app = create_app()
+    app.run(host=host, port=port, debug=debug)
 
 app = create_app()
 
 if __name__ == "__main__":  # pragma: no cover
-    # Run the Flask development server (local use only).
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    main()

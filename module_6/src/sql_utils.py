@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 # module_5/src/sql_utils.py
 
 """
