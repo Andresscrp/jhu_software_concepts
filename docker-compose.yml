@@ -63,7 +63,7 @@ services:
         condition: service_healthy
       db_init:
         condition: service_completed_successfully
-    command: ["python", "-m", "src.app"]
+    command: ["python", "-m", "src.web.run"]
     restart: unless-stopped
 
   worker:

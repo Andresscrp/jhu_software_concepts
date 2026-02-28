@@ -14,11 +14,11 @@ Features:
 """
 
 from __future__ import annotations
+from src.web.publisher import publish_task
 
 import os
 import subprocess
 import sys
-import threading
 from pathlib import Path
 from typing import Any
 
@@ -647,7 +647,9 @@ def create_app(
     Returns:
         Configured Flask app instance for running or testing.
     """
-    sql_utils.cover()
+    # Avoid AttributeError.
+    if hasattr(sql_utils, "cover"):
+        sql_utils.cover()
 
     flask_app = Flask(__name__)
 
@@ -665,20 +667,26 @@ def create_app(
 
     @flask_app.post("/pull-data")
     def pull_data():
-        """Trigger background data pull."""
         if lock_exists_fn():
             return jsonify({"busy": True}), 409
+        try:
+            publish_task("scrape_new_data", payload={})
+            return jsonify({"status": "queued", "task": "scrape_new_data"}), 202
+        except Exception:
+            current_app.logger.exception("Failed to publish scrape_new_data")
+            return jsonify({"error": "publish_failed"}), 503
 
-        t = threading.Thread(target=run_pull_fn, daemon=True)
-        t.start()
-        return jsonify({"ok": True}), 202
 
     @flask_app.post("/update-analysis")
     def update_analysis():
-        """Refresh analysis results."""
         if lock_exists_fn():
             return jsonify({"busy": True}), 409
-        return jsonify({"ok": True}), 200
+        try:
+            publish_task("recompute_analytics", payload={})
+            return jsonify({"status": "queued", "task": "recompute_analytics"}), 202
+        except Exception:
+            current_app.logger.exception("Failed to publish recompute_analytics")
+            return jsonify({"error": "publish_failed"}), 503
 
     return flask_app
 
@@ -690,7 +698,7 @@ def main() -> None:
     Some Docker configs import `main` from src.app (run.py: `from src.app import main`).
     This function starts the Flask dev server using the same settings as __main__.
     """
-    # Use env vars if present (nice for Docker), otherwise your defaults.
+    # Use env vars
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     port = int(os.getenv("FLASK_PORT", "8080"))
     debug = os.getenv("FLASK_DEBUG", "true").lower() in ("1", "true", "yes", "y")

@@ -138,3 +138,61 @@ def test_run_pull_pipeline_calls_subprocess_and_clears_lock(monkeypatch):
 
     run_calls = [c for c in calls if isinstance(c, tuple) and c[0] == "run"]
     assert len(run_calls) == 3
+
+
+from unittest.mock import MagicMock
+
+import pytest
+
+import src.app as appmod
+
+
+def _make_client(monkeypatch):
+    # Make "not busy" path happen
+    if hasattr(appmod, "lock_exists_fn"):
+        monkeypatch.setattr(appmod, "lock_exists_fn", lambda: False)
+    else:
+        # If your code checks LOCK_FILE.exists() indirectly, this makes it false.
+        # (harmless if unused)
+        monkeypatch.setattr(appmod, "LOCK_FILE", MagicMock(exists=lambda: False), raising=False)
+
+    flask_app = appmod.create_app()
+    return flask_app.test_client()
+
+
+def test_pull_data_calls_publish_task(monkeypatch):
+    mock_pub = MagicMock()
+    monkeypatch.setattr(appmod, "publish_task", mock_pub)
+
+    client = _make_client(monkeypatch)
+
+    resp = client.post("/pull-data")
+    assert resp.status_code == 202
+    mock_pub.assert_called_once_with("scrape_new_data", payload={})
+
+
+def test_update_analysis_calls_publish_task(monkeypatch):
+    mock_pub = MagicMock()
+    monkeypatch.setattr(appmod, "publish_task", mock_pub)
+
+    client = _make_client(monkeypatch)
+
+    resp = client.post("/update-analysis")
+    assert resp.status_code == 202
+    mock_pub.assert_called_once_with("recompute_analytics", payload={})
+
+
+def test_main_reads_env_and_calls_run(monkeypatch):
+    # Force env parsing lines 702-704 to execute predictably
+    monkeypatch.setenv("FLASK_HOST", "127.0.0.1")
+    monkeypatch.setenv("FLASK_PORT", "9999")
+    monkeypatch.setenv("FLASK_DEBUG", "no")  # should become False
+
+    fake_flask = MagicMock()
+    fake_flask.run = MagicMock()
+
+    monkeypatch.setattr(appmod, "create_app", lambda: fake_flask)
+
+    appmod.main()
+
+    fake_flask.run.assert_called_once_with(host="127.0.0.1", port=9999, debug=False)
