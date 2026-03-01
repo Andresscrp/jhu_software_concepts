@@ -1,341 +1,332 @@
-# Module 5 — Software Assurance + Secure SQL (SQLi Defense)
+# Module 6 — Deploy Anywhere (Docker Compose + RabbitMQ Microservices)
 
 **Name:** Andres Sanchez-Castellanos  
 **JHED ID:** asanch69  
 **Course:** 605.256 Modern Software Concepts in Python  
-**Module:** Module 5 — Software Assurance + Secure SQL
+**Module:** Module 6 — Deploy Anywhere
 
 ---
 
 ## Sources
 
 - Course lecture materials  
+- Docker documentation  
+- Docker Compose documentation  
+- RabbitMQ documentation  
+- AMQP documentation  
+- PostgreSQL documentation  
 - Flask documentation  
 - Psycopg documentation  
-- PostgreSQL documentation  
-- Pytest / pytest-cov documentation  
+- Pytest documentation  
 - Pylint documentation  
-- PyDeps documentation  
-- Graphviz documentation  
-- Snyk documentation  
 - ChatGPT  
-- Professor-provided LLM-extended dataset (`llm_extend_applicant_data.json`)
 
 ---
 
 ## Overview
 
-This project extends the GradCafe analytics system by applying software assurance and security practices.
+This module refactors the GradCafe Analytics system into a production-style microservice architecture using Docker Compose and RabbitMQ.
 
-It includes:
+The system separates responsibilities into independent services:
 
-- 10/10 Pylint static analysis  
-- SQL injection defenses using parameterized queries  
-- Mandatory LIMIT enforcement  
-- Least-privilege PostgreSQL user configuration  
-- Dependency graph generation with pydeps + Graphviz  
-- Reproducible virtual environments (pip + uv)  
-- Dependency vulnerability scanning with Snyk  
-- Continuous Integration enforcement with GitHub Actions  
-- 100% Pytest coverage  
+- PostgreSQL (database)
+- RabbitMQ (message broker)
+- Flask **web** service (publishes tasks, returns fast)
+- Background **worker** service (consumes tasks)
+- One-time **db_init** loader that imports the dataset
 
-The Flask application serves an Analysis Dashboard and supports controlled ETL execution.
+All long-running or data-modifying operations are decoupled from HTTP requests and executed asynchronously through a durable RabbitMQ queue.
 
-Endpoints:
+This architecture provides:
 
-- POST `/pull-data` — runs ETL pipeline  
-- POST `/update-analysis` — refreshes analysis results  
-- GET `/analysis` — main dashboard  
+- Improved reliability (no request timeouts)
+- Backpressure via message buffering
+- At-least-once delivery semantics
+- Transactional database commits
+- Reproducible container builds
+- Deployment parity across environments
 
-Concurrency is managed using a lock file.
+The entire stack runs on a clean machine using:
+
+docker compose up --build
+
+---
+
+## System Architecture
+
+Client Browser  
+        ↓  
+Flask Web (Port 8080)  
+        ↓ publish_task()  
+RabbitMQ (Exchange: tasks, Queue: tasks_q)  
+        ↓  
+Worker (prefetch=1, manual ACK)  
+        ↓  
+PostgreSQL Database  
+
+All write operations flow through RabbitMQ.  
+The web tier remains stateless and responsive.
+
+---
+
+## What the Application Does
+
+### Web Service
+
+- GET `/analysis` — analytics dashboard  
+- POST `/pull-data` — queues `"scrape_new_data"`  
+- POST `/update-analysis` — queues `"recompute_analytics"`  
+
+Each POST request returns:
+
+```json
+{"status":"queued","task":"<task_name>"}
+```
+
+with HTTP 202 Accepted.
+
+---
+
+### Worker Service
+
+The worker:
+
+- Connects using `RABBITMQ_URL`
+- Declares durable exchange `tasks`
+- Declares durable queue `tasks_q`
+- Binds routing key `tasks`
+- Uses `basic_qos(prefetch_count=1)`
+- Routes by message `kind`
+- Opens one database transaction per message
+- Commits on success
+- Acknowledges only after commit
+- NACKs without requeue on failure
+
+This ensures safe write paths and prevents infinite retry loops.
 
 ---
 
 ## Repository Structure
 
 ```
-module_5/
+module_6/
+
+docker-compose.yml
+README.md
+setup.py
 
 src/
-  app.py
-  clean.py
-  load_data.py
-  run.py
-  sql_utils.py
+  web/
+    Dockerfile
+    requirements.txt
+    publisher.py
+    run.py
+    app/
+
+  worker/
+    Dockerfile
+    requirements.txt
+    consumer.py
+    wait_for_rabbitmq.py
+
+  db/
+    load_data.py
+
+  data/
+    llm_extend_applicant_data.json
 
 tests/
-  test_app_coverage.py
-  test_db_insert.py
-  test_sql_utils_cover.py
-
 docs/
-  Sphinx documentation
-
-.github/workflows/
-  ci.yml
-
-dependency.svg
-pytest.ini
-requirements.txt
-setup.py
-README.md
-.env.example
 ```
 
 ---
 
-## Virtual Environment Setup
+## Services (docker-compose.yml)
 
-### Create Virtual Environment
+### 1) db (PostgreSQL)
 
-```powershell
-python -m venv .venv
-```
+- Image: postgres:16  
+- Database: gradcafe  
+- Port: 5432:5432  
+- Named Volume: pgdata  
+- Healthcheck: pg_isready -U postgres -d gradcafe  
 
-### Activate Virtual Environment (Every Time)
+---
 
-```powershell
-.venv\Scripts\Activate.ps1
-```
+### 2) rabbitmq (RabbitMQ + Management UI)
 
-You should see:
+- Image: rabbitmq:3-management  
+- Ports:  
+  - 5672 (AMQP)  
+  - 15672 (Management UI)  
+- Healthcheck: rabbitmq-diagnostics -q ping  
 
-```
-(.venv)
-```
+---
 
-in your terminal.
+### 3) db_init (One-shot Loader)
 
-### Install Dependencies
+- Runs: python /app/src/load_data.py  
+- Imports ~49,960 records  
+- Exits with code 0 on success  
+- Ensures database ready before web/worker start  
 
-```powershell
-pip install -r requirements.txt
-```
+---
+
+### 4) web (Flask Tier)
+
+- Port: 8080:8080  
+- Runs: python -m src.app  
+- Depends on healthy db + rabbitmq + completed db_init  
+- Publishes tasks using src/web/publisher.py  
+
+---
+
+### 5) worker (Task Consumer)
+
+- Runs: python -m src.worker.consumer  
+- Executes as non-root (USER 1000)  
+- Waits for RabbitMQ before starting  
+- Consumes tasks and executes them  
 
 ---
 
 ## Environment Variables
 
-This project uses environment variables for database credentials.
+### PostgreSQL
 
-### Required
+DATABASE_URL=postgresql://postgres:postgres@db:5432/gradcafe
 
-- DATABASE_URL  
-  OR  
-- DB_HOST  
-- DB_PORT  
-- DB_NAME  
-- DB_USER  
-- DB_PASSWORD  
+### RabbitMQ
 
-### Example (.env.example)
-
-```
-DATABASE_URL=postgresql://app_user:password@localhost:5432/module_3db
-```
-
-### Load .env (PowerShell)
-
-```powershell
-Get-Content .env | ForEach-Object {
-  if ($_ -match "=") {
-    $name, $value = $_ -split "=", 2
-    Set-Item env:$name $value
-  }
-}
-```
+RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/%2F
 
 ---
 
-## Running the Application
+## Running the System
 
-### Set Database URL
+From repository root:
 
-```powershell
-$env:DATABASE_URL="postgresql://app_user:<PASSWORD>@localhost:5432/module_3db"
-```
+docker compose down  
+docker compose up --build  
 
-### Start Flask
+Expected:
 
-```powershell
-python -m src.app
-```
-
-### Open Browser
-
-```
-http://127.0.0.1:5000/analysis
-```
+- db becomes healthy  
+- rabbitmq becomes healthy  
+- db_init loads dataset and exits 0  
+- web starts on http://127.0.0.1:8080  
+- worker begins consuming  
 
 ---
 
-## Running Tests (Pytest)
+## Verifying End-to-End Operation
 
-### All Tests
+### 1) Web Running
 
-```powershell
-python -m pytest -q
-```
+Open:
 
-### With Coverage
+http://127.0.0.1:8080
 
-```powershell
-python -m pytest --cov=src --cov-report=term-missing --cov-fail-under=100
-```
-
-Required:
-
-```
-TOTAL 100%
-```
+Redirects to `/analysis`.
 
 ---
 
-## Static Analysis (Pylint)
+### 2) Queueing Tasks
 
-```powershell
-python -m pylint src --fail-under=10
-```
+POST /pull-data  
+POST /update-analysis  
 
-Required:
+Response:
 
-```
-10.00/10
-```
+{"status":"queued","task":"..."}
 
----
-
-## SQL Injection Defenses
-
-All SQL queries:
-
-- Use parameter binding  
-- No f-strings  
-- No concatenation  
-- LIMIT enforced  
-- Normalized queries  
-- Safe validation  
-
-Security handled in `sql_utils.py`.
+Status: 202 Accepted.
 
 ---
 
-## Database Hardening
+### 3) Worker Logs
 
-Least-privilege user:
+docker compose logs -f worker
 
-```sql
-GRANT USAGE ON SCHEMA public TO app_user;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE applicants TO app_user;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;
+Expected output:
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
+received kind=scrape_new_data  
+acked kind=scrape_new_data  
+received kind=recompute_analytics  
+acked kind=recompute_analytics  
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA public
-GRANT USAGE, SELECT ON SEQUENCES TO app_user;
-```
+Confirms async pipeline works:
 
-No superuser privileges used.
+web → RabbitMQ → worker → PostgreSQL
 
 ---
 
-## Dependency Graph (pydeps)
+### 4) RabbitMQ Management UI (Optional)
 
-### Install
+http://localhost:15672  
 
-```powershell
-pip install pydeps
-```
-
-Install Graphviz separately.
-
-Verify:
-
-```powershell
-dot -V
-```
-
-### Generate
-
-```powershell
-pydeps src/app.py --noshow -T svg -o dependency.svg
-```
+Login:  
+guest  
+guest  
 
 ---
 
-## Packaging (setup.py)
+## Docker Hub Publication
 
-Enable editable install:
+Local images:
 
-```powershell
-pip install -e .
-```
+jhu_software_concepts-web:latest  
+jhu_software_concepts-worker:latest  
 
-Improves reproducibility and imports.
+Push:
 
----
+docker login  
 
-## Fresh Install
+docker tag jhu_software_concepts-web:latest andresscrp/jhu_web:latest  
+docker tag jhu_software_concepts-worker:latest andresscrp/jhu_worker:latest  
 
-### pip
+docker push andresscrp/jhu_web:latest  
+docker push andresscrp/jhu_worker:latest  
 
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pip install -e .
-```
+Repositories:
 
-### uv
-
-```powershell
-pip install uv
-uv venv
-.venv\Scripts\Activate.ps1
-uv pip sync requirements.txt
-```
+andresscrp/jhu_web  
+andresscrp/jhu_worker  
 
 ---
 
-## Snyk Scan
+## Testing
 
-### Authenticate
+Run:
 
-```powershell
-snyk auth
-```
+python -m pytest  
 
-### Test
+With coverage:
 
-```powershell
-snyk test
-```
+python -m pytest --cov=src --cov-report=term-missing  
 
-### Monitor (Optional)
-
-```powershell
-snyk monitor
-```
-
-Screenshot saved as `snyk-analysis.png`.
+Current coverage: ~92%
 
 ---
 
-## Continuous Integration
+## Static Analysis
 
-CI runs:
+python -m pylint src --fail-under=10  
 
-1. Pylint  
-2. Pytest  
-3. pydeps  
-4. Snyk  
+Target: 10.00/10  
 
-Workflow:
+---
 
-```
-.github/workflows/ci.yml
-```
+## Software Assurance Properties
+
+- Durable AMQP entities  
+- Persistent messages (delivery_mode=2)  
+- Idempotent queue declarations  
+- Transaction-per-message DB handling  
+- Manual acknowledgments  
+- Parameterized SQL queries  
+- Non-root container execution  
+- Reproducible container builds  
 
 ---
 
@@ -343,14 +334,12 @@ Workflow:
 
 Submitted:
 
-- module_5 folder  
-- dependency.svg  
-- snyk-analysis.png  
-- setup.py  
-- README.md  
-- PDF report  
-- CI workflow  
-- GitHub repo  
+- module_6 zipped folder  
+- Private GitHub repository link  
+- Docker Hub repository links  
+- PDF with required screenshots  
+- pytest output  
+- pylint output  
 
 All rubric requirements satisfied.
 
@@ -358,10 +347,12 @@ All rubric requirements satisfied.
 
 ## Notes
 
-This project demonstrates:
+This module demonstrates:
 
-- Secure SQL practices  
-- Reproducible builds  
-- Supply-chain security  
-- Automated testing  
-- Defensive Python engineering  
+- Microservice architecture  
+- Asynchronous task processing  
+- Container orchestration  
+- Reliable messaging  
+- Deployment reproducibility  
+
+The application now runs “deploy anywhere” via Docker Compose.
