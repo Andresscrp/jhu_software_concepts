@@ -1,19 +1,23 @@
-# Module 6 — Deploy Anywhere (Docker Compose + RabbitMQ Microservices)
+# Module 7 — Cloud Computing (AWS S3, SageMaker, EC2 Deployment)
 
 **Name:** Andres Sanchez-Castellanos  
 **JHED ID:** asanch69  
-**Course:** 605.256 Modern Software Concepts in Python  
-**Module:** Module 6 — Deploy Anywhere
+**Course:** EN.605.256 Modern Software Concepts in Python  
+**Module:** Module 7 — Cloud Computing
 
 ---
 
-## Sources
+# Sources
 
 - Course lecture materials  
+- AWS Documentation  
+- Amazon S3 documentation  
+- Amazon SageMaker documentation  
+- Amazon EC2 documentation  
+- boto3 documentation  
 - Docker documentation  
 - Docker Compose documentation  
 - RabbitMQ documentation  
-- AMQP documentation  
 - PostgreSQL documentation  
 - Flask documentation  
 - Psycopg documentation  
@@ -23,336 +27,334 @@
 
 ---
 
-## Overview
+# Overview
 
-This module refactors the GradCafe Analytics system into a production-style microservice architecture using Docker Compose and RabbitMQ.
+Module 7 extends the GradCafe Analytics platform into the cloud using Amazon Web Services (AWS).
 
-The system separates responsibilities into independent services:
+This module introduces two major capabilities:
 
-- PostgreSQL (database)
-- RabbitMQ (message broker)
-- Flask **web** service (publishes tasks, returns fast)
-- Background **worker** service (consumes tasks)
-- One-time **db_init** loader that imports the dataset
+1. **Cloud Data Pipeline**
 
-All long-running or data-modifying operations are decoupled from HTTP requests and executed asynchronously through a durable RabbitMQ queue.
+Data stored in **Amazon S3** is programmatically downloaded into a **SageMaker Jupyter Notebook** using the AWS SDK (`boto3`).
 
-This architecture provides:
+2. **Cloud Deployment**
 
-- Improved reliability (no request timeouts)
-- Backpressure via message buffering
-- At-least-once delivery semantics
-- Transactional database commits
-- Reproducible container builds
-- Deployment parity across environments
+The full **Docker Compose microservice system from Module 6** is deployed onto a live **EC2 instance**, demonstrating real-world deployment of containerized infrastructure in the cloud.
 
-The entire stack runs on a clean machine using:
+This produces a full cloud workflow:
 
-docker compose up --build
+S3 Storage  
+↓  
+boto3 Retrieval  
+↓  
+SageMaker Notebook Environment  
+↓  
+Dockerized Microservice Stack  
+↓  
+Flask Web App + Worker + RabbitMQ + PostgreSQL  
+↓  
+EC2 Cloud Server
 
 ---
 
-## System Architecture
+# Part 1 — S3 → SageMaker Data Pipeline
 
-Client Browser  
-        ↓  
-Flask Web (Port 8080)  
-        ↓ publish_task()  
-RabbitMQ (Exchange: tasks, Queue: tasks_q)  
-        ↓  
-Worker (prefetch=1, manual ACK)  
-        ↓  
+## S3 Storage
+
+A private S3 bucket stores the GradCafe dataset:
+
+Bucket name: **grad-cafe**
+
+Files uploaded:
+
+- applicant_data.json
+
+Public access is blocked to ensure secure storage.
+
+---
+
+## SageMaker Notebook
+
+A SageMaker notebook instance provides a managed Jupyter environment for running Python code and accessing AWS services.
+
+Configuration:
+
+Notebook name: **s3-to-sagemaker-grad-cafe-pipeline**  
+Instance type: **ml.t2.medium**  
+Platform: **Amazon Linux 2**
+
+The notebook used in this module is:
+
+grad-cafe-pipeline.ipynb
+
+---
+
+## boto3 Integration
+
+The dataset is downloaded from S3 using the AWS Python SDK (`boto3`).
+
+The implementation is located in:
+
+module_7/src/s3_fetch.py
+
+Example logic:
+
+    import boto3
+
+    s3 = boto3.client("s3")
+
+    s3.download_file(
+        "grad-cafe",
+        "applicant_data.json",
+        "applicant_data_SM.json"
+    )
+
+The file is saved locally inside the SageMaker notebook workspace as:
+
+applicant_data_SM.json
+
+---
+
+# Part 2 — Deploy Microservices to EC2
+
+The containerized microservice architecture created in **Module 6** is deployed onto an AWS EC2 server.
+
+---
+
+# EC2 Instance Configuration
+
+Instance Type: **t3.micro**  
+Operating System: **Ubuntu 22.04**
+
+Security Group Rules:
+
+Inbound SSH — Port 22  
+Inbound Web App — Port 8080
+
+PostgreSQL (5432) is **not publicly exposed**.  
+RabbitMQ management (15672) is **not publicly exposed**.
+
+---
+
+# Microservice Architecture
+
+The deployed system includes the following services:
+
+Flask Web Application  
+RabbitMQ Message Broker  
+Worker Consumer Service  
 PostgreSQL Database  
 
-All write operations flow through RabbitMQ.  
-The web tier remains stateless and responsive.
+Data flow:
+
+Client Browser  
+↓  
+Flask Web Service (Port 8080)  
+↓ publish_task()  
+RabbitMQ Queue  
+↓  
+Worker Consumer  
+↓  
+PostgreSQL Database
+
+All background processing tasks are handled asynchronously through RabbitMQ.
 
 ---
 
-## What the Application Does
+# Docker Compose Deployment
 
-### Web Service
+Deployment configuration is stored in:
 
-- GET `/analysis` — analytics dashboard  
-- POST `/pull-data` — queues `"scrape_new_data"`  
-- POST `/update-analysis` — queues `"recompute_analytics"`  
+module_7/ec2/docker-compose.ec2.yml
 
-Each POST request returns:
+Services included:
 
-```json
-{"status":"queued","task":"<task_name>"}
-```
-
-with HTTP 202 Accepted.
+- db → PostgreSQL database  
+- rabbitmq → message broker  
+- web → Flask application server  
+- worker → background processing service  
+- db_init → one-time database loader  
 
 ---
 
-### Worker Service
+# Running the Stack on EC2
 
-The worker:
+Typical deployment commands used:
 
-- Connects using `RABBITMQ_URL`
-- Declares durable exchange `tasks`
-- Declares durable queue `tasks_q`
-- Binds routing key `tasks`
-- Uses `basic_qos(prefetch_count=1)`
-- Routes by message `kind`
-- Opens one database transaction per message
-- Commits on success
-- Acknowledges only after commit
-- NACKs without requeue on failure
+    sudo apt update
+    sudo apt install docker.io docker-compose-plugin -y
 
-This ensures safe write paths and prevents infinite retry loops.
+    git clone <repository>
 
----
+    docker compose up -d --build
 
-## Repository Structure
+    docker compose ps
 
-```
-module_6/
+After deployment, the application is accessible at:
 
-docker-compose.yml
-README.md
-setup.py
-
-src/
-  web/
-    Dockerfile
-    requirements.txt
-    publisher.py
-    run.py
-    app/
-
-  worker/
-    Dockerfile
-    requirements.txt
-    consumer.py
-    wait_for_rabbitmq.py
-
-  db/
-    load_data.py
-
-  data/
-    llm_extend_applicant_data.json
-
-tests/
-docs/
-```
+http://<EC2_PUBLIC_IP>:8080
 
 ---
 
-## Services (docker-compose.yml)
+# Verifying Deployment
 
-### 1) db (PostgreSQL)
+### Containers Running
 
-- Image: postgres:16  
-- Database: gradcafe  
-- Port: 5432:5432  
-- Named Volume: pgdata  
-- Healthcheck: pg_isready -U postgres -d gradcafe  
+    docker compose ps
 
----
+Expected services:
 
-### 2) rabbitmq (RabbitMQ + Management UI)
-
-- Image: rabbitmq:3-management  
-- Ports:  
-  - 5672 (AMQP)  
-  - 15672 (Management UI)  
-- Healthcheck: rabbitmq-diagnostics -q ping  
+- db  
+- rabbitmq  
+- web  
+- worker  
 
 ---
 
-### 3) db_init (One-shot Loader)
+### Web Application
 
-- Runs: python /app/src/load_data.py  
-- Imports ~49,960 records  
-- Exits with code 0 on success  
-- Ensures database ready before web/worker start  
+Open in browser:
 
----
+http://<EC2_PUBLIC_IP>:8080/analysis
 
-### 4) web (Flask Tier)
-
-- Port: 8080:8080  
-- Runs: python -m src.app  
-- Depends on healthy db + rabbitmq + completed db_init  
-- Publishes tasks using src/web/publisher.py  
+The GradCafe analytics dashboard should load successfully.
 
 ---
 
-### 5) worker (Task Consumer)
+### Worker Processing
 
-- Runs: python -m src.worker.consumer  
-- Executes as non-root (USER 1000)  
-- Waits for RabbitMQ before starting  
-- Consumes tasks and executes them  
+Worker services consume tasks from RabbitMQ and update PostgreSQL asynchronously.
 
----
-
-## Environment Variables
-
-### PostgreSQL
-
-DATABASE_URL=postgresql://postgres:postgres@db:5432/gradcafe
-
-### RabbitMQ
-
-RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/%2F
-
----
-
-## Running the System
-
-From repository root:
-
-docker compose down  
-docker compose up --build  
-
-Expected:
-
-- db becomes healthy  
-- rabbitmq becomes healthy  
-- db_init loads dataset and exits 0  
-- web starts on http://127.0.0.1:8080  
-- worker begins consuming  
-
----
-
-## Verifying End-to-End Operation
-
-### 1) Web Running
-
-Open:
-
-http://127.0.0.1:8080
-
-Redirects to `/analysis`.
-
----
-
-### 2) Queueing Tasks
-
-POST /pull-data  
-POST /update-analysis  
-
-Response:
-
-{"status":"queued","task":"..."}
-
-Status: 202 Accepted.
-
----
-
-### 3) Worker Logs
-
-docker compose logs -f worker
-
-Expected output:
-
-received kind=scrape_new_data  
-acked kind=scrape_new_data  
-received kind=recompute_analytics  
-acked kind=recompute_analytics  
-
-Confirms async pipeline works:
+Pipeline:
 
 web → RabbitMQ → worker → PostgreSQL
 
 ---
 
-### 4) RabbitMQ Management UI (Optional)
+# Repository Structure
 
-http://localhost:15672  
+module_7/
 
-Login:  
-guest  
-guest  
+grad-cafe-pipeline.ipynb  
+requirements.txt  
+README.md  
 
----
+src/  
+ s3_fetch.py  
+ web/  
+ worker/  
 
-## Docker Hub Publication
+ec2/  
+ docker-compose.ec2.yml  
+ EC2_DEPLOYMENT.md  
 
-Local images:
-
-jhu_software_concepts-web:latest  
-jhu_software_concepts-worker:latest  
-
-Push:
-
-docker login  
-
-docker tag jhu_software_concepts-web:latest andresscrp/jhu_web:latest  
-docker tag jhu_software_concepts-worker:latest andresscrp/jhu_worker:latest  
-
-docker push andresscrp/jhu_web:latest  
-docker push andresscrp/jhu_worker:latest  
-
-Repositories:
-
-andresscrp/jhu_web  
-andresscrp/jhu_worker  
+Screenshots:  
+ mfa.png  
+ dailyWork.png  
+ grad-cafe-bucket.png  
+ liveNotebook.png  
+ ec2-instance.png  
+ ec2-security-group.png  
+ ec2-compose-ps.png  
+ ec2-app.png  
 
 ---
 
-## Testing
+# Required Screenshots
 
-Run:
+The following verification screenshots are included:
 
-python -m pytest  
-
-With coverage:
-
-python -m pytest --cov=src --cov-report=term-missing  
-
-Current coverage: ~92%
-
----
-
-## Static Analysis
-
-python -m pylint src --fail-under=10  
-
-Target: 10.00/10  
+mfa.png — Root account MFA enabled  
+dailyWork.png — IAM user permissions  
+grad-cafe-bucket.png — S3 bucket contents  
+liveNotebook.png — SageMaker notebook instance running  
+ec2-instance.png — EC2 instance details  
+ec2-security-group.png — EC2 inbound security rules  
+ec2-compose-ps.png — Docker services running  
+ec2-app.png — Live EC2 application
 
 ---
 
-## Software Assurance Properties
+# Testing
 
-- Durable AMQP entities  
-- Persistent messages (delivery_mode=2)  
-- Idempotent queue declarations  
-- Transaction-per-message DB handling  
-- Manual acknowledgments  
-- Parameterized SQL queries  
-- Non-root container execution  
-- Reproducible container builds  
+Run tests with:
 
----
+    python -m pytest
 
-## Final Deliverables
+Coverage:
 
-Submitted:
-
-- module_6 zipped folder  
-- Private GitHub repository link  
-- Docker Hub repository links  
-- PDF with required screenshots  
-- pytest output  
-- pylint output  
-
-All rubric requirements satisfied.
+    python -m pytest --cov=src
 
 ---
 
-## Notes
+# Static Analysis
 
-This module demonstrates:
+Code quality verified with:
 
-- Microservice architecture  
-- Asynchronous task processing  
-- Container orchestration  
-- Reliable messaging  
-- Deployment reproducibility  
+    pylint src --fail-under=10
 
-The application now runs “deploy anywhere” via Docker Compose.
+Target score: **10.00/10**
+
+---
+
+# Security Practices
+
+Security measures implemented:
+
+- AWS root account protected with MFA  
+- IAM user created for daily operations  
+- S3 bucket private (public access blocked)  
+- EC2 security groups restricted  
+- RabbitMQ not exposed publicly  
+- PostgreSQL not exposed publicly  
+- Secrets excluded from repository  
+
+---
+
+# Stopping AWS Resources
+
+To avoid unnecessary charges after completing the assignment:
+
+Stop EC2 instance:
+
+AWS Console → EC2 → Instances → Stop
+
+Stop SageMaker notebook:
+
+AWS Console → SageMaker → Notebook Instances → Stop
+
+Resources are **stopped but not deleted** because they will be used again in Module 8.
+
+---
+
+# Final Deliverables
+
+Submitted to Canvas:
+
+module_7.zip
+
+GitHub repository contains:
+
+- SageMaker pipeline notebook  
+- boto3 S3 integration  
+- EC2 deployment configuration  
+- Docker Compose microservice system  
+- required screenshots  
+- tests and linting artifacts  
+
+---
+
+# Summary
+
+This module demonstrates a complete cloud workflow including:
+
+- AWS account security configuration  
+- S3 object storage  
+- boto3 cloud integration  
+- SageMaker data processing environment  
+- Docker container orchestration  
+- RabbitMQ asynchronous task processing  
+- PostgreSQL persistent storage  
+- Live EC2 deployment
+
+The GradCafe Analytics platform now runs fully in a cloud infrastructure environment.
