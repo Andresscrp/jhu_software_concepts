@@ -112,30 +112,63 @@ def make_elbow_plot(tfidf_matrix) -> None:
 
 def make_major_plots(df: pd.DataFrame) -> None:
     """Create GRE/GRE V plots for Philosophy and Computer Science clusters."""
-    # Convert score columns to numeric
+    df = df.copy()
     df["GRE"] = pd.to_numeric(df.get("gre_general"), errors="coerce")
     df["GRE V"] = pd.to_numeric(df.get("gre_verbal"), errors="coerce")
 
-    # Find the dominant cluster for Philosophy
+    # Keep only realistic modern GRE-style values for plotting
+    df = df[
+        (df["GRE"].notna()) & (df["GRE V"].notna()) &
+        (df["GRE"].between(130, 170)) &
+        (df["GRE V"].between(130, 170))
+    ].copy()
+
+    # Philosophy cluster
     philosophy_rows = df[df["Program"].str.contains("Philosophy", case=False, na=False)]
     philosophy_cluster = philosophy_rows["cluster"].mode().iloc[0]
     philosophy_df = df[df["cluster"] == philosophy_cluster].copy()
 
     print("\nPhilosophy cluster preview:")
-    print(philosophy_df[["Program", "University", "cluster", "GRE", "GRE V"]].head(20).to_string())
-
-    philosophy_scores = philosophy_df[["GRE", "GRE V"]].dropna()
+    print(
+        philosophy_df[
+            ["Program", "University", "cluster", "GRE", "GRE V"]
+        ].head(20).to_string()
+    )
 
     plt.figure(figsize=(8, 6))
     plt.boxplot(
-        [philosophy_scores["GRE"], philosophy_scores["GRE V"]],
-        labels=["GRE", "GRE V"],
+        [philosophy_df["GRE"], philosophy_df["GRE V"]],
+        tick_labels=["GRE", "GRE V"],
     )
     plt.title("GRE and GRE Verbal Scores for Philosophy Majors")
     plt.xlabel("GRE Component")
     plt.ylabel("Score")
     plt.tight_layout()
     plt.savefig("philosophy.png")
+    plt.close()
+
+    # Computer Science cluster
+    cs_rows = df[df["Program"].str.contains("Computer Science", case=False, na=False)]
+    cs_cluster = cs_rows["cluster"].mode().iloc[0]
+    cs_df = df[df["cluster"] == cs_cluster].copy()
+
+    print("\nComputer Science cluster preview:")
+    print(
+        cs_df[
+            ["Program", "University", "cluster", "GRE", "GRE V"]
+        ].head(20).to_string()
+    )
+
+    plt.figure(figsize=(8, 6))
+    plt.boxplot(
+        [cs_df["GRE"], cs_df["GRE V"]],
+        tick_labels=["GRE", "GRE V"],
+    )
+    plt.title("GRE and GRE Verbal Scores for Computer Science Majors")
+    plt.xlabel("GRE Component")
+    plt.ylabel("Score")
+    plt.tight_layout()
+    plt.savefig("computer_science.png")
     plt.close()
 
     # Find the dominant cluster for Computer Science
