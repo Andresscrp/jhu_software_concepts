@@ -102,9 +102,9 @@ def build_plotly_figure(df):
 
 data = preprocess_data(load_data())
 
-plot_1_src = encode_image("plots/plot_1_experience_salary.png")
-plot_2_src = encode_image("plots/plot_2_role_salary.png")
-plot_3_fig = build_plotly_figure(data)
+PLOT_1_SRC = encode_image("plots/plot_1_experience_salary.png")
+PLOT_2_SRC = encode_image("plots/plot_2_role_salary.png")
+PLOT_3_FIG = build_plotly_figure(data)
 
 app = Dash(__name__)
 
@@ -122,11 +122,11 @@ app.layout = html.Div(
             "interactive chart examines how remote work relates to compensation."
         ),
         html.H2("Salary by Experience Level"),
-        html.Img(src=plot_1_src, style={"width": "80%", "display": "block"}),
+        html.Img(src=PLOT_1_SRC, style={"width": "80%", "display": "block"}),
         html.H2("Salary by Role Group"),
-        html.Img(src=plot_2_src, style={"width": "80%", "display": "block"}),
+        html.Img(src=PLOT_2_SRC, style={"width": "80%", "display": "block"}),
         html.H2("Remote Work and Salary"),
-        dcc.Graph(figure=plot_3_fig),
+        dcc.Graph(figure=PLOT_3_FIG),
     ],
 )
 
