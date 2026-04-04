@@ -111,9 +111,11 @@ Specialized technical roles command higher salaries than general analytics roles
 
 # Visualization 3 — Salary vs Remote Work (Interactive)
 
-Interactive Plot:
+![Salary vs Remote Work](plots/plot_3_interactive.png)
 
-plots/plot_3_interactive.html
+Interactive version:
+
+[Plotly Interactive Chart](plots/plot_3_interactive.html)
 
 This scatter plot explores the relationship between salary and remote work.
 
@@ -220,4 +222,4 @@ This module demonstrates a complete data analysis and visualization workflow:
 - Interactive visualization (Plotly)  
 - Dashboard development (Dash)  
 
-The project successfully answers the research question by showing that **experience and role specialization are the primary drivers of salary in AI careers**, while remote work has a limited direct impact.
+The answers the research question by showing that **experience and role specialization are the primary drivers of salary in AI careers**, while remote work has a limited direct impact.
