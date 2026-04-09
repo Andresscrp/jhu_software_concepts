@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import mlflow
+import mlflow.sklearn
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.cluster import KMeans
@@ -31,10 +33,8 @@ def load_and_prepare_data(filepath: str) -> pd.DataFrame:
     """Load the GradCafe dataset and prepare Program and University columns."""
     df = pd.read_json(filepath)
 
-    # Remove rows where the program field is missing.
     df = df[df["program"].notna()].copy()
 
-    # Normalize whitespace in the original program field.
     df["program"] = (
         df["program"]
         .astype(str)
@@ -42,10 +42,8 @@ def load_and_prepare_data(filepath: str) -> pd.DataFrame:
         .str.replace(r"\s+", " ", regex=True)
     )
 
-    # Start by assuming the full program text is the program name.
     df["Program"] = df["program"]
 
-    # Prefer an existing school/university-style column if the dataset has one.
     university_candidates = (
         "school",
         "university",
@@ -73,9 +71,6 @@ def load_and_prepare_data(filepath: str) -> pd.DataFrame:
     else:
         df["University"] = "Unknown"
 
-    # Only split the program field on the first comma when the second half
-    # actually looks like a school name. This avoids bad splits such as:
-    # "Genomics, Systems Biology" -> university = "Systems Biology"
     split_cols = df["program"].str.split(",", n=1, expand=True)
 
     if split_cols.shape[1] > 1:
@@ -90,6 +85,7 @@ def load_and_prepare_data(filepath: str) -> pd.DataFrame:
             should_split & university_unknown,
             "University",
         ] = second_part.loc[should_split & university_unknown].values
+
     print(f"Number of Entries: {len(df)}")
     print(f"Number of Unique Program Input Names: {df['Program'].nunique()}")
 
@@ -113,8 +109,32 @@ def run_initial_clustering(tfidf_matrix: Any) -> tuple[pd.Series, Any]:
     pca_2d = PCA(n_components=2, random_state=42)
     reduced_data = pca_2d.fit_transform(tfidf_matrix.toarray())
 
-    kmeans = KMeans(n_clusters=50, max_iter=100, n_init=5, random_state=42)
-    cluster_labels = kmeans.fit_predict(reduced_data)
+    # MLflow tracking setup
+    mlflow.set_tracking_uri("http://localhost:8080")
+    mlflow.set_experiment("KMeans Clustering")
+
+    params = {
+        "max_iter": 500,
+        "n_clusters": 25,
+        "n_init": 5,
+        "random_state": 42,
+    }
+
+    with mlflow.start_run():
+
+        mlflow.log_params(params)
+
+        kmeans = KMeans(**params)
+        cluster_labels = kmeans.fit_predict(reduced_data)
+
+        mlflow.log_metric("inertia", kmeans.inertia_)
+
+        mlflow.sklearn.log_model(kmeans, "model")
+
+        mlflow.register_model(
+            f"runs:/{mlflow.active_run().info.run_id}/model",
+            "Clustering"
+        )
 
     plt.figure(figsize=(12, 9))
     scatter = plt.scatter(
@@ -225,76 +245,36 @@ def make_major_plots(df: pd.DataFrame) -> None:
         & (df["GRE V"].between(130, 170))
     ].copy()
 
-    philosophy_rows = df[
-        df["Program"].str.contains("Philosophy", case=False, na=False)
-    ]
+    philosophy_rows = df[df["Program"].str.contains("Philosophy", case=False, na=False)]
     philosophy_cluster = philosophy_rows["cluster"].mode().iloc[0]
     philosophy_df = df[df["cluster"] == philosophy_cluster].copy()
 
-    print("\nPhilosophy cluster preview:")
-    print(
-        philosophy_df[
-            ["Program", "University", "cluster", "GRE", "GRE V"]
-        ].head(20).to_string()
-    )
-
     plt.figure(figsize=(8, 6))
-    plt.boxplot(
-        [philosophy_df["GRE"], philosophy_df["GRE V"]],
-        tick_labels=["GRE", "GRE V"],
-    )
+    plt.boxplot([philosophy_df["GRE"], philosophy_df["GRE V"]], tick_labels=["GRE", "GRE V"])
     plt.plot([], [], label="Philosophy Cluster")
-    plt.title("GRE and GRE Verbal Scores for Philosophy Majors")
-    plt.xlabel("GRE Component")
-    plt.ylabel("Score")
     plt.legend()
-    plt.tight_layout()
     plt.savefig("philosophy.png")
     plt.close()
 
-    cs_rows = df[
-        df["Program"].str.contains("Computer Science", case=False, na=False)
-    ]
+    cs_rows = df[df["Program"].str.contains("Computer Science", case=False, na=False)]
     cs_cluster = cs_rows["cluster"].mode().iloc[0]
     cs_df = df[df["cluster"] == cs_cluster].copy()
 
-    print("\nComputer Science cluster preview:")
-    print(
-        cs_df[
-            ["Program", "University", "cluster", "GRE", "GRE V"]
-        ].head(20).to_string()
-    )
-
     plt.figure(figsize=(8, 6))
-    plt.boxplot(
-        [cs_df["GRE"], cs_df["GRE V"]],
-        tick_labels=["GRE", "GRE V"],
-    )
+    plt.boxplot([cs_df["GRE"], cs_df["GRE V"]], tick_labels=["GRE", "GRE V"])
     plt.plot([], [], label="Computer Science Cluster")
-    plt.title("GRE and GRE Verbal Scores for Computer Science Majors")
-    plt.xlabel("GRE Component")
-    plt.ylabel("Score")
     plt.legend()
-    plt.tight_layout()
     plt.savefig("computer_science.png")
     plt.close()
 
 
 def main() -> None:
-    """Run the full Module 9 clustering workflow."""
     df = load_and_prepare_data("../module_8/cleaned_gradcafe.json")
-    print(df[["Program", "University"]].head(10).to_string())
 
     _, tfidf_matrix = vectorize_programs(df)
     cluster_labels, _ = run_initial_clustering(tfidf_matrix)
 
-    print("Initial clustering complete.")
-    print("Number of cluster labels:", len(cluster_labels))
-
     clustered_df = attach_clusters(df, cluster_labels)
-
-    print("\nLast 5 rows:")
-    print(clustered_df[["Program", "University", "cluster"]].tail(5).to_string())
 
     save_dataframe_image(clustered_df)
     make_elbow_plot(tfidf_matrix)

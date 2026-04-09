@@ -1,0 +1,40 @@
+{
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "CPython 3.13.3",
+  "startedAt": "2026-04-09T16:41:25.916395Z",
+  "program": "D:\\School\\JHU\\Modern Softwaree Concepts in Python\\code\\jhu_software_concepts\\module_11\\kmeans_mlops_pipeline.py",
+  "codePath": "module_11\\kmeans_mlops_pipeline.py",
+  "codePathLocal": "kmeans_mlops_pipeline.py",
+  "git": {
+    "remote": "https://github.com/Andresscrp/jhu_software_concepts.git",
+    "commit": "d06a93523fc84c1617ade2efaf13bdcebcdf2136"
+  },
+  "email": "andresscrp@gmail.com",
+  "root": "D:\\School\\JHU\\Modern Softwaree Concepts in Python\\code\\jhu_software_concepts\\module_11",
+  "host": "AndresPC",
+  "executable": "D:\\School\\JHU\\Modern Softwaree Concepts in Python\\code\\jhu_software_concepts\\.venv\\Scripts\\python.exe",
+  "cpu_count": 12,
+  "cpu_count_logical": 24,
+  "gpu": "NVIDIA GeForce RTX 4080 SUPER",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1024191361024",
+      "used": "919817732096"
+    }
+  },
+  "memory": {
+    "total": "66125660160"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4080 SUPER",
+      "memoryTotal": "17171480576",
+      "cudaCores": 10240,
+      "architecture": "Ada",
+      "uuid": "GPU-df3f83de-4a5b-c2f2-a514-1ad78164ccfd"
+    }
+  ],
+  "cudaVersion": "13.2",
+  "writerId": "g0vsfq02fsqrnrdajoakt80dbd9ptcfy"
+}
