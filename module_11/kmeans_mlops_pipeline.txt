@@ -4,14 +4,14 @@ from __future__ import annotations
 from typing import Any
 
 import joblib
-import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
+import matplotlib.pyplot as plt
 import pandas as pd
+import wandb
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
-import wandb
 
 USE_WANDB = True
 
@@ -200,7 +200,7 @@ def save_dataframe_image(df: pd.DataFrame) -> None:
     """Save the first 100 rows of the clustered dataframe as an image."""
     preview_df = df[["Program", "University", "cluster"]].head(100).copy()
 
-    _, ax = plt.subplots(figsize=(18, 30))
+    fig, ax = plt.subplots(figsize=(18, 30))
     ax.axis("off")
 
     table = ax.table(
@@ -288,7 +288,6 @@ def make_major_plots(df: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    """Run the full Module 11 clustering and tracking workflow."""
     df = load_and_prepare_data("../module_8/cleaned_gradcafe.json")
 
     _, tfidf_matrix = vectorize_programs(df)

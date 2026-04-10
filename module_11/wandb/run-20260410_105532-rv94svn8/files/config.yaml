@@ -1,0 +1,62 @@
+_wandb:
+    value:
+        cli_version: 0.25.1
+        e:
+            yh6vrio3s6du6zuc6rd06artxai6kacv:
+                codePath: module_11\kmeans_mlops_pipeline.py
+                codePathLocal: kmeans_mlops_pipeline.py
+                cpu_count: 12
+                cpu_count_logical: 24
+                cudaVersion: "13.2"
+                disk:
+                    /:
+                        total: "1024191361024"
+                        used: "919349714944"
+                email: andresscrp@gmail.com
+                executable: D:\School\JHU\Modern Softwaree Concepts in Python\code\jhu_software_concepts\.venv\Scripts\python.exe
+                git:
+                    commit: 470d50ee6c78f6c61f50ab968d7fa99716abc91a
+                    remote: https://github.com/Andresscrp/jhu_software_concepts.git
+                gpu: NVIDIA GeForce RTX 4080 SUPER
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 10240
+                      memoryTotal: "17171480576"
+                      name: NVIDIA GeForce RTX 4080 SUPER
+                      uuid: GPU-df3f83de-4a5b-c2f2-a514-1ad78164ccfd
+                host: AndresPC
+                memory:
+                    total: "66125660160"
+                os: Windows-11-10.0.26200-SP0
+                program: D:\School\JHU\Modern Softwaree Concepts in Python\code\jhu_software_concepts\module_11\kmeans_mlops_pipeline.py
+                python: CPython 3.13.3
+                root: D:\School\JHU\Modern Softwaree Concepts in Python\code\jhu_software_concepts\module_11
+                startedAt: "2026-04-10T14:55:32.526685Z"
+                writerId: yh6vrio3s6du6zuc6rd06artxai6kacv
+        m: []
+        python_version: 3.13.3
+        t:
+            "1":
+                - 5
+                - 53
+            "2":
+                - 5
+                - 53
+            "3":
+                - 2
+                - 16
+            "4": 3.13.3
+            "5": 0.25.1
+            "8":
+                - 3
+            "12": 0.25.1
+            "13": windows-amd64
+max_iter:
+    value: 500
+n_clusters:
+    value: 25
+n_init:
+    value: 5
+random_state:
+    value: 42
