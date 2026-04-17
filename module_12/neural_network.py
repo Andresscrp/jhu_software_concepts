@@ -1,0 +1,344 @@
+"""Module 12 — Two-layer neural network for admissions prediction."""
+from __future__ import annotations
+
+import copy
+import re
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+RANDOM_SEED = 42
+HIDDEN_UNITS = 6
+LEARNING_RATE = 0.05
+MAX_EPOCHS = 10000
+PATIENCE = 100
+
+
+def extract_numeric_value(value: object) -> float:
+    """Extract the first numeric value from a mixed string like 'GPA 3.89'."""
+    if value is None or pd.isna(value):
+        return np.nan
+
+    text_value = str(value).strip()
+    match = re.search(r"-?\d+(?:\.\d+)?", text_value)
+
+    if match is None:
+        return np.nan
+
+    return float(match.group())
+
+
+def load_and_prepare_data(filepath: str) -> tuple[pd.DataFrame, list[str]]:
+    """Load applicant data and prepare the six required input features."""
+    df = pd.read_json(filepath, lines=True)
+
+    print(f"Original number of rows: {len(df)}")
+
+    df = df[df["applicant_status"].isin(["Accepted", "Rejected"])].copy()
+    df = df[df["masters_or_phd"].isin(["Masters", "PhD"])].copy()
+
+    print(f"Rows after filtering: {len(df)}")
+
+    numeric_columns = ["gpa", "gre", "gre_v", "gre_aw"]
+    for column in numeric_columns:
+        df[column] = df[column].apply(extract_numeric_value)
+
+    # Treat non-positive values as missing placeholders for this dataset.
+    df.loc[df["gpa"] <= 0, "gpa"] = np.nan
+    df.loc[df["gre"] <= 0, "gre"] = np.nan
+    df.loc[df["gre_v"] <= 0, "gre_v"] = np.nan
+    df.loc[df["gre_aw"] <= 0, "gre_aw"] = np.nan
+
+    df["ms_vs_phd"] = (df["masters_or_phd"] == "PhD").astype(int)
+
+    df["international_vs_local"] = (
+        df["citizenship"].fillna("").str.strip().str.lower() != "american"
+    ).astype(int)
+
+    df["target"] = (df["applicant_status"] == "Accepted").astype(int)
+
+    accepted_count = int((df["target"] == 1).sum())
+    rejected_count = int((df["target"] == 0).sum())
+
+    feature_columns = [
+        "gpa",
+        "gre",
+        "gre_v",
+        "gre_aw",
+        "ms_vs_phd",
+        "international_vs_local",
+    ]
+
+    print(f"Accepted rows: {accepted_count}")
+    print(f"Rejected rows: {rejected_count}")
+    print("Final input features:")
+    print(feature_columns)
+    print("\nFirst few rows of cleaned data:")
+    print(df[feature_columns + ["target"]].head().to_string())
+
+    return df, feature_columns
+
+
+def split_and_preprocess(
+    df: pd.DataFrame,
+    feature_columns: list[str],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, pd.Series, pd.Series, pd.Series]:
+    """Split the data and standardize it using training-set statistics only."""
+    x = df[feature_columns].copy()
+    y = df["target"].copy()
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        x,
+        y,
+        test_size=0.2,
+        random_state=42,
+        shuffle=True,
+    )
+
+    train_medians = x_train.median()
+    x_train = x_train.fillna(train_medians)
+    x_test = x_test.fillna(train_medians)
+
+    train_means = x_train.mean()
+    train_stds = x_train.std().replace(0, 1)
+
+    x_train = (x_train - train_means) / train_stds
+    x_test = (x_test - train_means) / train_stds
+
+    print("\nTraining / Test Split")
+    print(f"Training set size: {len(x_train)}")
+    print(f"Test set size: {len(x_test)}")
+
+    print("\nTraining-set medians:")
+    print(train_medians.to_string())
+
+    print("\nTraining-set means:")
+    print(train_means.to_string())
+
+    print("\nTraining-set standard deviations:")
+    print(train_stds.to_string())
+
+    print("\nWhy use training-set medians, means, and standard deviations only?")
+    print(
+        "We must compute preprocessing statistics from the training set only "
+        "to avoid leaking information from the test set into the model. "
+        "Using the full dataset would let the model indirectly learn from "
+        "data it is supposed to be evaluated on."
+    )
+
+    return (
+        x_train.to_numpy(dtype=float),
+        x_test.to_numpy(dtype=float),
+        y_train.to_numpy(dtype=float).reshape(-1, 1),
+        y_test.to_numpy(dtype=float).reshape(-1, 1),
+        train_medians,
+        train_means,
+        train_stds,
+    )
+
+
+class TwoLayerNeuralNetwork:
+    """A fully connected two-layer neural network built with NumPy only."""
+
+    def __init__(self, input_dim: int, hidden_units: int, learning_rate: float) -> None:
+        """Initialize weights and biases."""
+        rng = np.random.default_rng(RANDOM_SEED)
+
+        self.W1 = rng.normal(0, 0.1, size=(input_dim, hidden_units))
+        self.b1 = np.zeros((1, hidden_units))
+
+        self.W2 = rng.normal(0, 0.1, size=(hidden_units, 1))
+        self.b2 = np.zeros((1, 1))
+
+        self.learning_rate = learning_rate
+
+    @staticmethod
+    def sigmoid(x: np.ndarray) -> np.ndarray:
+        """Apply the sigmoid activation function."""
+        x = np.clip(x, -50, 50)
+        return 1.0 / (1.0 + np.exp(-x))
+
+    @staticmethod
+    def mse_loss(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        """Compute mean squared error."""
+        return float(np.mean((y_true - y_pred) ** 2))
+
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        """Run a forward pass through the network."""
+        self.Z1 = x @ self.W1 + self.b1
+        self.A1 = self.sigmoid(self.Z1)
+
+        self.Z2 = self.A1 @ self.W2 + self.b2
+        self.A2 = self.sigmoid(self.Z2)
+
+        return self.A2
+
+    def backward(self, x: np.ndarray, y_true: np.ndarray, y_pred: np.ndarray) -> None:
+        """Run backpropagation and update parameters."""
+        n_samples = x.shape[0]
+
+        dA2 = 2.0 * (y_pred - y_true) / n_samples
+        dZ2 = dA2 * y_pred * (1.0 - y_pred)
+
+        dW2 = self.A1.T @ dZ2
+        db2 = np.sum(dZ2, axis=0, keepdims=True)
+
+        dA1 = dZ2 @ self.W2.T
+        dZ1 = dA1 * self.A1 * (1.0 - self.A1)
+
+        dW1 = x.T @ dZ1
+        db1 = np.sum(dZ1, axis=0, keepdims=True)
+
+        self.W2 -= self.learning_rate * dW2
+        self.b2 -= self.learning_rate * db2
+        self.W1 -= self.learning_rate * dW1
+        self.b1 -= self.learning_rate * db1
+
+    def predict_proba(self, x: np.ndarray) -> np.ndarray:
+        """Return probability-like outputs."""
+        return self.forward(x)
+
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        """Return binary predictions using a 0.5 threshold."""
+        probabilities = self.predict_proba(x)
+        return (probabilities >= 0.5).astype(int)
+
+
+def compute_accuracy(y_true: np.ndarray, y_pred_labels: np.ndarray) -> float:
+    """Compute classification accuracy."""
+    return float(np.mean(y_true == y_pred_labels))
+
+
+def train_model(
+    model: TwoLayerNeuralNetwork,
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_test: np.ndarray,
+    y_test: np.ndarray,
+) -> dict[str, list[float] | int | float]:
+    """Train the network with early stopping based on test MSE."""
+    history: dict[str, list[float] | int | float] = {
+        "train_mse": [],
+        "test_mse": [],
+        "test_accuracy": [],
+    }
+
+    best_test_mse = float("inf")
+    best_epoch = -1
+    epochs_without_improvement = 0
+    best_parameters = None
+
+    log_lines = []
+
+    for epoch in range(1, MAX_EPOCHS + 1):
+        train_predictions = model.forward(x_train)
+        train_mse = model.mse_loss(y_train, train_predictions)
+
+        model.backward(x_train, y_train, train_predictions)
+
+        test_predictions = model.forward(x_test)
+        test_mse = model.mse_loss(y_test, test_predictions)
+        test_labels = (test_predictions >= 0.5).astype(int)
+        test_accuracy = compute_accuracy(y_test, test_labels)
+
+        history["train_mse"].append(train_mse)
+        history["test_mse"].append(test_mse)
+        history["test_accuracy"].append(test_accuracy)
+
+        if epoch % 100 == 0:
+            line = (
+                f"Epoch {epoch:5d} | "
+                f"Train MSE: {train_mse:.6f} | "
+                f"Test MSE: {test_mse:.6f} | "
+                f"Test Accuracy: {test_accuracy:.4f}"
+            )
+            print(line)
+            log_lines.append(line)
+
+        if test_mse < best_test_mse:
+            best_test_mse = test_mse
+            best_epoch = epoch
+            epochs_without_improvement = 0
+            best_parameters = {
+                "W1": copy.deepcopy(model.W1),
+                "b1": copy.deepcopy(model.b1),
+                "W2": copy.deepcopy(model.W2),
+                "b2": copy.deepcopy(model.b2),
+            }
+        else:
+            epochs_without_improvement += 1
+
+        if epochs_without_improvement >= PATIENCE:
+            print(f"\nEarly stopping triggered at epoch {epoch}.")
+            log_lines.append(f"Early stopping triggered at epoch {epoch}.")
+            break
+
+    if best_parameters is not None:
+        model.W1 = best_parameters["W1"]
+        model.b1 = best_parameters["b1"]
+        model.W2 = best_parameters["W2"]
+        model.b2 = best_parameters["b2"]
+
+    with open("training.log", "w", encoding="utf-8") as log_file:
+        log_file.write("\n".join(log_lines) + "\n")
+
+    history["best_epoch"] = best_epoch
+    history["best_test_mse"] = best_test_mse
+
+    return history
+
+
+def main() -> None:
+    """Run preprocessing, training, and final evaluation."""
+    df, feature_columns = load_and_prepare_data(
+        "../module_6/src/llm_extend_applicant_data.json"
+    )
+    x_train, x_test, y_train, y_test, _, _, _ = split_and_preprocess(
+        df,
+        feature_columns,
+    )
+
+    model = TwoLayerNeuralNetwork(
+        input_dim=x_train.shape[1],
+        hidden_units=HIDDEN_UNITS,
+        learning_rate=LEARNING_RATE,
+    )
+
+    print("\nNetwork parameter shapes:")
+    print(f"W1 shape: {model.W1.shape}")
+    print(f"b1 shape: {model.b1.shape}")
+    print(f"W2 shape: {model.W2.shape}")
+    print(f"b2 shape: {model.b2.shape}")
+
+    history = train_model(model, x_train, y_train, x_test, y_test)
+
+    final_train_predictions = model.predict_proba(x_train)
+    final_test_predictions = model.predict_proba(x_test)
+
+    final_train_labels = (final_train_predictions >= 0.5).astype(int)
+    final_test_labels = (final_test_predictions >= 0.5).astype(int)
+
+    final_train_accuracy = compute_accuracy(y_train, final_train_labels)
+    final_test_accuracy = compute_accuracy(y_test, final_test_labels)
+
+    print("\nFinal Evaluation")
+    print(f"Best epoch: {history['best_epoch']}")
+    print(f"Best test MSE: {history['best_test_mse']:.6f}")
+    print(f"Final training accuracy: {final_train_accuracy:.4f}")
+    print(f"Final test accuracy: {final_test_accuracy:.4f}")
+    print(f"Number of rows used after filtering: {len(df)}")
+    print(f"Final train size: {len(x_train)}")
+    print(f"Final test size: {len(x_test)}")
+
+    print("\nDiscussion")
+    print(
+        "This model may overfit if training performance keeps improving while "
+        "test performance stops improving. The final test accuracy should be "
+        "interpreted cautiously because the dataset contains limited features "
+        "and many GRE-related values appear to be missing or zero."
+    )
+
+
+if __name__ == "__main__":
+    main()
