@@ -6,6 +6,7 @@ import re
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
 RANDOM_SEED = 42
@@ -294,7 +295,7 @@ def main() -> None:
     df, feature_columns = load_and_prepare_data(
         "../module_6/src/llm_extend_applicant_data.json"
     )
-    x_train, x_test, y_train, y_test, _, _, _ = split_and_preprocess(
+    x_train, x_test, y_train, y_test, train_medians, train_means, train_stds = split_and_preprocess(
         df,
         feature_columns,
     )
@@ -312,6 +313,8 @@ def main() -> None:
     print(f"b2 shape: {model.b2.shape}")
 
     history = train_model(model, x_train, y_train, x_test, y_test)
+    plot_mse_curve(history)
+    test_artificial_applicants(model, train_medians, train_means, train_stds)
 
     final_train_predictions = model.predict_proba(x_train)
     final_test_predictions = model.predict_proba(x_test)
@@ -339,6 +342,57 @@ def main() -> None:
         "and many GRE-related values appear to be missing or zero."
     )
 
+def plot_mse_curve(history: dict[str, list[float] | int | float]) -> None:
+    """Plot training and test MSE over epochs."""
+    train_mse = history["train_mse"]
+    test_mse = history["test_mse"]
+    epochs = range(1, len(train_mse) + 1)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(epochs, train_mse, label="Training MSE")
+    plt.plot(epochs, test_mse, label="Test MSE")
+    plt.title("Training and Test MSE Over Time")
+    plt.xlabel("Epoch")
+    plt.ylabel("Mean Squared Error")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("mse_curve.png")
+    plt.close()
+
+def test_artificial_applicants(
+    model: TwoLayerNeuralNetwork,
+    train_medians: pd.Series,
+    train_means: pd.Series,
+    train_stds: pd.Series,
+) -> None:
+    """Create artificial applicants, preprocess them, and print predictions."""
+    artificial_applicants = pd.DataFrame(
+        {
+            "gpa": [3.9, 3.2],
+            "gre": [330, 300],
+            "gre_v": [165, 150],
+            "gre_aw": [4.5, 3.0],
+            "ms_vs_phd": [1.0, 0.0],
+            "international_vs_local": [1.0, 0.0],
+        }
+    )
+
+    processed_applicants = artificial_applicants.fillna(train_medians)
+    processed_applicants = (processed_applicants - train_means) / train_stds
+
+    applicant_array = processed_applicants.to_numpy(dtype=float)
+
+    predicted_probabilities = model.predict_proba(applicant_array).flatten()
+    predicted_labels = (predicted_probabilities >= 0.5).astype(int)
+    predicted_status = np.where(predicted_labels == 1, "Accepted", "Rejected")
+
+    output_df = artificial_applicants.copy()
+    output_df["predicted_probability"] = predicted_probabilities
+    output_df["predicted_label"] = predicted_labels
+    output_df["predicted_status"] = predicted_status
+
+    print("\nArtificial Applicant Predictions")
+    print(output_df.to_string(index=False))
 
 if __name__ == "__main__":
     main()
