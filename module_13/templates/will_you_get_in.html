@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Will You Get In?</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f6f8fa;
+            color: #222;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        textarea {
+            height: 100px;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px 18px;
+            border: none;
+            border-radius: 6px;
+            background-color: #1f6feb;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #eef6ff;
+            border-left: 5px solid #1f6feb;
+            border-radius: 6px;
+        }
+
+        .disclaimer {
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #fff7d6;
+            border-left: 5px solid #d29922;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            background-color: #f0f0f0;
+            padding: 12px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Will You Get In?</h1>
+
+    <p>
+        Enter applicant information below to receive a prediction from the
+        fine-tuned admissions model.
+    </p>
+
+    <div class="disclaimer">
+        <strong>Disclaimer:</strong>
+        This is a class project model trained on scraped, self-reported GradCafe-style data.
+        It is not a real admissions tool, and the result should not be interpreted as an
+        actual admissions decision.
+    </div>
+
+    <form method="post">
+        <label for="program">Program Name</label>
+        <input
+            type="text"
+            id="program"
+            name="program"
+            placeholder="Computer Science, Johns Hopkins University"
+        >
+
+        <label for="comments">Comments / Applicant Statement</label>
+        <textarea
+            id="comments"
+            name="comments"
+            placeholder="Research experience, application notes, interests, etc."
+        ></textarea>
+
+        <label for="gpa">GPA</label>
+        <input type="text" id="gpa" name="gpa" placeholder="3.85">
+
+        <label for="gre">GRE</label>
+        <input type="text" id="gre" name="gre" placeholder="330">
+
+        <label for="gre_v">GRE Verbal</label>
+        <input type="text" id="gre_v" name="gre_v" placeholder="162">
+
+        <label for="gre_aw">GRE Analytical Writing</label>
+        <input type="text" id="gre_aw" name="gre_aw" placeholder="4.5">
+
+        <label for="degree">Degree Type</label>
+        <select id="degree" name="degree">
+            <option value="">Unknown</option>
+            <option value="Masters">Masters</option>
+            <option value="PhD">PhD</option>
+        </select>
+
+        <label for="citizenship">Citizenship / Applicant Origin</label>
+        <select id="citizenship" name="citizenship">
+            <option value="">Unknown</option>
+            <option value="American">American</option>
+            <option value="International">International</option>
+        </select>
+
+        <button type="submit">Predict Admission Result</button>
+    </form>
+
+    {% if prediction_result %}
+        <div class="result">
+            <h2>Prediction Result</h2>
+            <p>
+                <strong>Prediction:</strong>
+                {{ prediction_result.prediction }}
+            </p>
+            <p>
+                <strong>Model score:</strong>
+                {{ "%.4f"|format(prediction_result.accepted_probability) }}
+            </p>
+
+            <h3>Model Input Used</h3>
+            <pre>{{ prediction_result.model_input }}</pre>
+        </div>
+    {% endif %}
+</div>
+</body>
+</html>
